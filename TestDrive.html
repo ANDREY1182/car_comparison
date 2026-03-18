@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>🏁 Трековая симуляция: Статистика круга</title>
+    <title>🏁 Трековая симуляция: Сравни авто</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
         body { margin: 0; padding: 8px; background: #0b1a2f; color: #eef; display: flex; flex-direction: column; min-height: 100vh; }
@@ -132,9 +132,9 @@
     </style>
 </head>
 <body>
-    <h1>🏎️ СТАТИСТИКА КРУГА</h1>
+    <h1>🏎️ TEST DRIVE</h1>
     <div class="tabs">
-        <button class="tab-btn active" data-tab="cars">⚙️ Авто А / Б</button>
+        <button class="tab-btn active" data-tab="cars">⚙️ Параметры Автомобилей</button>
         <button class="tab-btn" data-tab="track">🛣️ Конфиг трассы</button>
         <button class="tab-btn" data-tab="race">🏁 СИМУЛЯТОР</button>
     </div>
@@ -217,7 +217,7 @@
         <div class="param-row"><label>Длина круга, м</label><input type="number" id="trackLength" value="1800" step="50" readonly style="background:#1a2a3a;"></div>
         <div class="param-row"><label>Кол-во поворотов</label><input type="number" id="trackTurns" value="8" min="4" max="16" readonly style="background:#1a2a3a;"></div>
         <div class="param-row"><label>Ширина трассы, м</label><input type="number" id="trackWidth" value="10" min="6" max="20"></div>
-        <div class="param-row"><label>Сцепление</label><input type="number" id="grip" value="1.0" step="0.05"></div>
+        <div class="param-row"><label>Сцепление</label><input type="number" id="grip" value="0.7" step="0.05"></div>
         
         <div class="track-preview">
             <canvas id="trackPreviewCanvas" width="400" height="300"></canvas>
