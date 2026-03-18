@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>🏁 Трековая симуляция: Статистика круга</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
+        body { margin: 0; padding: 8px; background: #0b1a2f; color: #eef; display: flex; flex-direction: column; min-height: 100vh; }
+        .tabs { display: flex; gap: 6px; background: #1f2a40; padding: 5px; border-radius: 40px; margin: 10px 0 15px; }
+        .tab-btn { flex: 1; background: transparent; border: none; color: #aab; font-weight: 600; padding: 10px 2px; border-radius: 30px; font-size: 0.95rem; }
+        .tab-btn.active { background: #ffae42; color: #0b1a2f; }
+        .panel { display: none; background: #1b263b; border-radius: 30px; padding: 16px 12px; margin-bottom: 18px; }
+        .panel.active { display: block; }
+        .param-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+        .param-row label { width: 130px; font-size: 0.9rem; color: #ccd; }
+        .param-row input, .param-row select { flex: 1; min-width: 140px; background: #2c3750; border: 1px solid #456; border-radius: 24px; padding: 12px 12px; color: white; font-size: 0.95rem; }
+        .param-row input.track-name { border-color: #4a7c9a; font-weight: bold; background: #1a2a3a; }
+        
+        button { background: #ffae42; border: none; color: #0b1a2f; font-weight: 700; border-radius: 40px; padding: 14px 16px; font-size: 1rem; margin: 12px 0 4px; width: 100%; box-shadow: 0 5px 0 #a87020; }
+        button:active { transform: translateY(4px); box-shadow: 0 1px 0 #a87020; }
+        .small-btn { background: #36455e; color: white; box-shadow: 0 4px 0 #1f2a40; }
+        .btn-group { display: flex; gap: 6px; margin-top: 8px; }
+        .btn-group button { flex: 1; margin: 0; font-size: 0.9rem; padding: 10px; }
+        .btn-save { background: #4a7c59; box-shadow: 0 4px 0 #2a4c39; }
+        .btn-load { background: #597c4a; box-shadow: 0 4px 0 #394c2a; }
+        
+        .file-row { display: flex; gap: 6px; }
+        .file-row input { display: none; }
+        .file-row label { flex: 1; background: #36455e; border-radius: 30px; padding: 12px; text-align: center; cursor: pointer; }
+        
+        .track-container { background: #1e2a3a; border-radius: 30px; padding: 15px 10px; margin: 15px 0; border: 3px solid #5f7a9a; touch-action: none; }
+        canvas { display: block; width: 100%; height: auto; background: #2b5f3b; border-radius: 24px; border: 3px solid #aaa; touch-action: none; }
+        .stats-row { display: flex; gap: 15px; margin: 10px 0; background: #1f2a40; border-radius: 26px; padding: 15px; }
+        .car-stat { flex: 1; background: #0f1a2c; border-radius: 22px; padding: 12px; text-align: center; }
+        .car-name-display { font-weight: bold; color: #ffcf8a; display: block; margin-bottom: 5px; font-size: 0.9rem; }
+        .winner-badge { background: #2f425b; border-radius: 40px; padding: 16px; text-align: center; margin: 10px 0; }
+        .gap-display { background: linear-gradient(135deg, #1e3c5a 0%, #2d5a7a 100%); border-radius: 20px; padding: 12px 20px; margin-top: 10px; text-align: center; font-size: 1.1rem; font-weight: 700; border: 2px solid #4a7c9a; }
+        .gap-display .gap-value { color: #ffcf8a; font-size: 1.5rem; margin: 0 10px; }
+        .gap-display .leader { color: #8aff8a; }
+        .note { font-size: 0.8rem; color: #889; margin-top: 4px; font-style: italic; }
+        .section-title { color: #ffae42; font-size: 1.1rem; margin: 15px 0 10px; border-bottom: 1px solid #36455e; padding-bottom: 5px; }
+        .track-preview { background: #1a2a3a; border-radius: 16px; padding: 10px; margin: 10px 0; text-align: center; }
+        .track-info { font-size: 0.85rem; color: #aab; margin-top: 8px; }
+        
+        /* Панель статистики круга */
+        .lap-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;            gap: 12px;
+            margin-top: 15px;
+        }
+        .lap-stat-card {
+            background: linear-gradient(135deg, #1a2a3a 0%, #2a3a4a 100%);
+            border-radius: 20px;
+            padding: 16px;
+            text-align: center;
+            border: 2px solid #3a4a5a;
+        }
+        .lap-stat-card.car-a { border-color: #ff8a8a; }
+        .lap-stat-card.car-b { border-color: #8ab8ff; }
+        .lap-stat-title {
+            font-size: 0.85rem;
+            color: #889;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .lap-stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+            padding: 6px 0;
+            border-bottom: 1px solid #2a3a4a;
+        }
+        .lap-stat-row:last-child {
+            border-bottom: none;
+        }
+        .lap-stat-label {
+            font-size: 0.8rem;
+            color: #aab;
+        }
+        .lap-stat-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffcf8a;
+        }
+        .lap-stat-value.highlight {
+            color: #8aff8a;
+            font-size: 1.2rem;
+        }
+        .accel-badge {
+            background: #2a4a5a;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            color: #8ab8ff;
+            margin-left: 6px;
+        }
+        /* Новые стили для управления генерацией */
+        .generator-controls {
+            background: #1a2a3a;
+            border-radius: 20px;
+            padding: 15px;
+            margin: 15px 0;
+            border: 2px solid #4a7c9a;
+        }
+        .generator-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .generator-row label {
+            width: 100px;
+            color: #ffcf8a;
+        }
+        .generator-row input {
+            flex: 1;
+            background: #2c3750;
+            border: 1px solid #456;
+            border-radius: 24px;
+            padding: 10px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏎️ СТАТИСТИКА КРУГА</h1>
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="cars">⚙️ Авто А / Б</button>
+        <button class="tab-btn" data-tab="track">🛣️ Конфиг трассы</button>
+        <button class="tab-btn" data-tab="race">🏁 СИМУЛЯТОР</button>
+    </div>
+
+    <div id="cars-panel" class="panel active">
+        <div class="section-title">🚗 Автомобиль А</div>
+        <div class="param-row">
+            <label>Марка/Модель</label>
+            <input type="text" id="a_name" class="car-name" value="LADA Vesta 1.6 2016">
+        </div>
+        <div class="param-row"><label>Мощность, л.с.</label><input type="number" id="a_power" value="106"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="a_powerRpm" value="5800"></div>
+        <div class="param-row"><label>Момент макс, Нм</label><input type="number" id="a_torque" value="148"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="a_torqueRpm" value="4200"></div>
+        <div class="param-row"><label>Масса, кг</label><input type="number" id="a_mass" value="1220"></div>
+        <div class="param-row"><label>КПП (ряд)</label><input type="text" id="a_gears" value="3.727;2.048;1.393;1.029;0.795"></div>
+        <div class="param-row"><label>Главная пара</label><input type="number" id="a_final" value="3.867" step="0.001"></div>
+        <div class="param-row"><label>Шины</label><input type="text" id="a_tire" value="195/55 R16"></div>
+        <div class="param-row"><label>Тип кузова</label><select id="a_body"><option value="sedan" selected>Седан</option><option value="suv">Кроссовер</option></select></div>
+        
+        <div class="btn-group">
+            <button class="btn-save" id="saveBtnA">💾 Сохранить А</button>
+            <button class="btn-load" id="loadBtnA">📂 Загрузить А</button>
+            <input type="file" id="loadFileA" accept=".json" style="display:none">
+        </div>
+
+        <div class="section-title">🚙 Автомобиль Б</div>
+        <div class="param-row">
+            <label>Марка/Модель</label>
+            <input type="text" id="b_name" class="car-name" value="Skoda Yeti 1.2 TSI">
+        </div>
+        <div class="param-row"><label>Мощность, л.с.</label><input type="number" id="b_power" value="105"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="b_powerRpm" value="5000"></div>
+        <div class="param-row"><label>Момент макс, Нм</label><input type="number" id="b_torque" value="175"></div>
+        <div class="param-row"><label>при об/мин</label><input type="number" id="b_torqueRpm" value="4100"></div>
+        <div class="param-row"><label>Масса, кг</label><input type="number" id="b_mass" value="1370"></div>
+        <div class="param-row"><label>КПП (ряд)</label><input type="text" id="b_gears" value="3.615;1.955;1.281;0.973;0.778;0.646"></div>
+        <div class="param-row"><label>Главная пара</label><input type="number" id="b_final" value="4.353" step="0.001"></div>
+        <div class="param-row"><label>Шины</label><input type="text" id="b_tire" value="215/60 R16"></div>
+        <div class="param-row"><label>Тип кузова</label><select id="b_body"><option value="sedan">Седан</option><option value="suv" selected>Кроссовер</option></select></div>
+        
+        <div class="btn-group">
+            <button class="btn-save" id="saveBtnB">💾 Сохранить Б</button>
+            <button class="btn-load" id="loadBtnB">📂 Загрузить Б</button>            <input type="file" id="loadFileB" accept=".json" style="display:none">
+        </div>
+
+        <button id="resetParams" style="margin-top:15px;">↻ Сброс А/Б эталон</button>
+    </div>
+
+    <div id="track-panel" class="panel">
+        <h3>🛣️ Параметры трассы</h3>
+        
+        <div class="generator-controls">
+            <div class="section-title">🎲 Генератор трасс</div>
+            <div class="generator-row">
+                <label>Повороты:</label>
+                <input type="number" id="genTurns" min="3" max="25" value="12">
+            </div>
+            <div class="generator-row">
+                <label>Кривизна:</label>
+                <input type="number" id="genCurvature" min="0" max="100" step="10" value="100">
+            </div>
+            <div class="generator-row">
+                <label>Радиус поворотов:</label>
+                <input type="number" id="cornerRadius" min="10" max="80" value="40">
+            </div>
+            <button id="generateTrackBtn" style="margin:5px 0;">🎲 Сгенерировать новую трассу</button>
+        </div>
+        
+        <div class="param-row">
+            <label>Название трассы</label>
+            <input type="text" id="trackName" class="track-name" value="Домашний трек">
+        </div>
+        <div class="param-row">
+            <label>Тип трассы</label>
+            <select id="trackTypeSelect">
+                <option value="drag">🏁 Драг (1/4 мили)</option>
+                <option value="oval">⭕ Овал (кольцо)</option>
+                <option value="twisty" selected>🐍 Извилистая</option>
+            </select>
+        </div>
+        <div class="param-row"><label>Длина круга, м</label><input type="number" id="trackLength" value="1800" step="50"></div>
+        <div class="param-row"><label>Кол-во поворотов</label><input type="number" id="trackTurns" value="8" min="4" max="16"></div>
+        <div class="param-row"><label>Ширина трассы, м</label><input type="number" id="trackWidth" value="10" min="6" max="20"></div>
+        <div class="param-row"><label>Сцепление</label><input type="number" id="grip" value="1.0" step="0.05"></div>
+        
+        <div class="track-preview">
+            <canvas id="trackPreviewCanvas" width="400" height="300"></canvas>
+            <div class="track-info" id="trackInfo">Тип: Извилистая • 1800м • 8 поворотов</div>
+        </div>
+        
+        <div class="btn-group">
+            <button class="btn-save" id="saveTrackBtn">💾 Сохранить трассу (CSV)</button>
+            <button class="btn-load" id="loadTrackBtn">📂 Загрузить трассу (CSV)</button>
+            <input type="file" id="loadTrackFile" accept=".csv" style="display:none">
+        </div>
+        <button id="applyTrackBtn" style="margin-top:10px;">✅ Применить трассу</button>
+    </div>
+
+    <div id="race-panel" class="panel">
+        <h2>🏁 СИМУЛЯЦИЯ</h2>
+        <div class="track-container">
+            <canvas id="trackCanvas" width="800" height="600"></canvas>
+        </div>
+        <div class="stats-row">
+            <div class="car-stat">
+                <span class="car-name-display" id="nameDisplayA" style="color:#ff8a8a;">LADA Vesta</span>
+                <span id="speedA">0</span> км/ч • <span id="gearA">1</span> • <span id="rpmA">0</span> об/мин
+            </div>
+            <div class="car-stat">
+                <span class="car-name-display" id="nameDisplayB" style="color:#8ab8ff;">Skoda Yeti</span>                <span id="speedB">0</span> км/ч • <span id="gearB">1</span> • <span id="rpmB">0</span> об/мин
+            </div>
+        </div>
+        <div class="winner-badge" id="liveWinner">Гонка: идёт</div>
+        <div class="gap-display">
+            Отставание: <span class="gap-value" id="gapValue">0</span> м <span id="gapLeader"></span>
+        </div>
+        
+        <!-- ПАНЕЛЬ СТАТИСТИКИ КРУГА -->
+        <div class="lap-stats">
+            <div class="lap-stat-card car-a">
+                <div class="lap-stat-title" id="lapTitleA">LADA Vesta</div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">⏱️ 0-100 км/ч</span>
+                    <span class="lap-stat-value highlight" id="accel0to100A">--.-- с</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">📊 Средняя скорость</span>
+                    <span class="lap-stat-value" id="avgSpeedA">0 км/ч</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">🏁 Лучший круг</span>
+                    <span class="lap-stat-value" id="bestLapA">--:--.--</span>
+                </div>
+            </div>
+            <div class="lap-stat-card car-b">
+                <div class="lap-stat-title" id="lapTitleB">Skoda Yeti</div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">⏱️ 0-100 км/ч</span>
+                    <span class="lap-stat-value highlight" id="accel0to100B">--.-- с</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">📊 Средняя скорость</span>
+                    <span class="lap-stat-value" id="avgSpeedB">0 км/ч</span>
+                </div>
+                <div class="lap-stat-row">
+                    <span class="lap-stat-label">🏁 Лучший круг</span>
+                    <span class="lap-stat-value" id="bestLapB">--:--.--</span>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 8px;">
+            <button id="startSimBtn">▶ СТАРТ / ПАУЗА</button>
+            <button id="resetSimBtn" class="small-btn">⏸ Сброс</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ========== ПАРАМЕТРЫ АВТО ==========
+            function getCarAData() {
+                return {
+                    name: document.getElementById('a_name').value || "Car A",
+                    power: parseFloat(document.getElementById('a_power').value) || 106,
+                    powerRpm: parseFloat(document.getElementById('a_powerRpm').value) || 5800,
+                    torque: parseFloat(document.getElementById('a_torque').value) || 148,
+                    torqueRpm: parseFloat(document.getElementById('a_torqueRpm').value) || 4200,
+                    mass: parseFloat(document.getElementById('a_mass').value) || 1220,
+                    gearRatios: document.getElementById('a_gears').value.split(';').map(Number).filter(v=>!isNaN(v)),
+                    finalDrive: parseFloat(document.getElementById('a_final').value) || 3.867,
+                    tire: document.getElementById('a_tire').value,
+                    body: document.getElementById('a_body').value
+                };
+            }
+            function getCarBData() {
+                return {
+                    name: document.getElementById('b_name').value || "Car B",
+                    power: parseFloat(document.getElementById('b_power').value) || 105,
+                    powerRpm: parseFloat(document.getElementById('b_powerRpm').value) || 5000,
+                    torque: parseFloat(document.getElementById('b_torque').value) || 175,
+                    torqueRpm: parseFloat(document.getElementById('b_torqueRpm').value) || 4100,
+                    mass: parseFloat(document.getElementById('b_mass').value) || 1370,
+                    gearRatios: document.getElementById('b_gears').value.split(';').map(Number).filter(v=>!isNaN(v)),
+                    finalDrive: parseFloat(document.getElementById('b_final').value) || 4.353,
+                    tire: document.getElementById('b_tire').value,
+                    body: document.getElementById('b_body').value
+                };
+            }
+
+            // ========== ПАРАМЕТРЫ ТРАССЫ ==========
+            let trackConfig = {
+                name: "Домашний трек",
+                type: "twisty",
+                length: 1800,
+                turns: 8,
+                width: 10,
+                grip: 1.0,
+                centerLine: [],
+                cornerRadii: [] // Массив радиусов поворотов
+            };
+
+            // ========== ГЕНЕРАТОР ТРАСС ==========
+            class TrackGenerator {
+                constructor(width, height) {
+                    this.width = width;
+                    this.height = height;
+                    this.padding = 60;
+                }
+
+                generatePolygon(numCorners, curvatureCoeff) {
+                    const points = [];
+                    const centerX = this.width / 2;
+                    const centerY = this.height / 2;
+                    const baseRadius = Math.min(this.width, this.height) / 2.5;
+                    
+                    const maxVariation = baseRadius * (curvatureCoeff / 100) * 1.5;
+                    const maxRadius = Math.min(this.width, this.height) / 2 - this.padding;
+                    
+                    for (let i = 0; i < numCorners; i++) {
+                        const angle = (i / numCorners) * Math.PI * 2;
+                        const radiusVariation = (Math.random() - 0.5) * 2 * maxVariation;
+                        let radius = baseRadius + radiusVariation;
+                        
+                        radius = Math.min(radius, maxRadius);
+                        radius = Math.max(radius, this.padding);
+                        
+                        const angleVariation = (Math.random() - 0.5) * 0.3 * (curvatureCoeff / 50);
+                        const finalAngle = angle + angleVariation;
+                        
+                        let x = centerX + Math.cos(finalAngle) * radius;
+                        let y = centerY + Math.sin(finalAngle) * radius;
+                        
+                        x = Math.max(this.padding, Math.min(this.width - this.padding, x));
+                        y = Math.max(this.padding, Math.min(this.height - this.padding, y));
+                        
+                        points.push({ x, y });
+                    }
+                    
+                    return points;
+                }
+
+                roundCorner(p0, p1, p2, radius) {
+                    const v1 = { x: p0.x - p1.x, y: p0.y - p1.y };
+                    const v2 = { x: p2.x - p1.x, y: p2.y - p1.y };
+                    
+                    const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+                    const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+                    
+                    const u1 = { x: v1.x / len1, y: v1.y / len1 };
+                    const u2 = { x: v2.x / len2, y: v2.y / len2 };
+                    
+                    const dot = u1.x * u2.x + u1.y * u2.y;
+                    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+                    
+                    let dist = radius / Math.tan(angle / 2);
+                    
+                    const maxDist = Math.min(len1, len2) * 0.45;
+                    if (dist > maxDist) {
+                        dist = maxDist;
+                        radius = dist * Math.tan(angle / 2);
+                    }
+                    
+                    const t1 = {
+                        x: p1.x + u1.x * dist,
+                        y: p1.y + u1.y * dist
+                    };
+                    const t2 = {
+                        x: p1.x + u2.x * dist,
+                        y: p1.y + u2.y * dist
+                    };
+                    
+                    const vt1 = { x: t1.x - p1.x, y: t1.y - p1.y };
+                    const vt2 = { x: t2.x - p1.x, y: t2.y - p1.y };
+                    
+                    const vt1Len = Math.sqrt(vt1.x * vt1.x + vt1.y * vt1.y);
+                    const vt2Len = Math.sqrt(vt2.x * vt2.x + vt2.y * vt2.y);
+                    
+                    const vt1Norm = { x: vt1.x / vt1Len, y: vt1.y / vt1Len };
+                    const vt2Norm = { x: vt2.x / vt2Len, y: vt2.y / vt2Len };
+                    
+                    const bisector = { 
+                        x: vt1Norm.x + vt2Norm.x, 
+                        y: vt1Norm.y + vt2Norm.y 
+                    };
+                    
+                    const bisectorLen = Math.sqrt(bisector.x * bisector.x + bisector.y * bisector.y);
+                    bisector.x /= bisectorLen;
+                    bisector.y /= bisectorLen;
+                    
+                    const centerDist = radius / Math.sin(angle / 2);
+                    const center = {
+                        x: p1.x + bisector.x * centerDist,
+                        y: p1.y + bisector.y * centerDist
+                    };
+                    
+                    const startAngle = Math.atan2(t1.y - center.y, t1.x - center.x);
+                    const endAngle = Math.atan2(t2.y - center.y, t2.x - center.x);
+                    
+                    let deltaAngle = endAngle - startAngle;
+                    while (deltaAngle <= -Math.PI) deltaAngle += 2 * Math.PI;
+                    while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+                    
+                    return {
+                        center: center,
+                        radius: radius,
+                        startAngle: startAngle,
+                        endAngle: endAngle,
+                        clockwise: deltaAngle < 0,
+                        startPoint: t1,
+                        endPoint: t2
+                    };
+                }
+
+                generateCenterLine(numCorners = 10, curvatureCoeff = 100, cornerRadius = 40) {
+                    const polygon = this.generatePolygon(numCorners, curvatureCoeff);
+                    const allPoints = [];
+                    const radii = [];
+                    
+                    const arcs = [];
+                    for (let i = 0; i < polygon.length; i++) {
+                        const p0 = polygon[(i - 1 + polygon.length) % polygon.length];
+                        const p1 = polygon[i];
+                        const p2 = polygon[(i + 1) % polygon.length];
+                        
+                        const arc = this.roundCorner(p0, p1, p2, cornerRadius);
+                        arcs.push(arc);
+                        radii.push(arc.radius);
+                    }
+                    
+                    for (let i = 0; i < arcs.length; i++) {
+                        const arc = arcs[i];
+                        const nextArc = arcs[(i + 1) % arcs.length];
+                        
+                        const steps = 20;
+                        const angleStep = (arc.endAngle - arc.startAngle) / steps;
+                        
+                        for (let j = 0; j <= steps; j++) {
+                            const angle = arc.startAngle + angleStep * j;
+                            const x = arc.center.x + Math.cos(angle) * arc.radius;
+                            const y = arc.center.y + Math.sin(angle) * arc.radius;
+                            allPoints.push({ x, y });
+                        }
+                        
+                        const lineSteps = 15;
+                        for (let j = 1; j < lineSteps; j++) {
+                            const t = j / lineSteps;
+                            const x = arc.endPoint.x + (nextArc.startPoint.x - arc.endPoint.x) * t;
+                            const y = arc.endPoint.y + (nextArc.startPoint.y - arc.endPoint.y) * t;
+                            allPoints.push({ x, y });
+                        }
+                    }
+                    
+                    const uniquePoints = [];
+                    const tolerance = 3;
+                    
+                    for (let i = 0; i < allPoints.length; i++) {
+                        const point = allPoints[i];
+                        let isDuplicate = false;
+                        
+                        for (let j = Math.max(0, uniquePoints.length - 10); j < uniquePoints.length; j++) {
+                            const existing = uniquePoints[j];
+                            const dist = Math.sqrt(
+                                Math.pow(point.x - existing.x, 2) + 
+                                Math.pow(point.y - existing.y, 2)
+                            );
+                            if (dist < tolerance) {
+                                isDuplicate = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!isDuplicate) {
+                            uniquePoints.push(point);
+                        }
+                    }
+                    
+                    return { points: uniquePoints, radii };
+                }
+            }
+
+            let trackGenerator;
+
+            // ========== НОВАЯ ФУНКЦИЯ РАСЧЕТА СКОРОСТИ В ПОВОРОТЕ ==========
+            function calculateCornerSpeed(mass, radius, grip) {
+                // Базовая скорость из центробежной силы: v = sqrt(g * grip * radius)
+                const g = 9.81;
+                let v_ms = Math.sqrt(g * grip * radius);  // скорость в м/с
+                
+                // Коррекция по массе: более тяжелые машины медленнее в поворотах
+                const massFactor = 1.0 - Math.min(mass, 5000) / 5000 * 0.35;
+                v_ms = v_ms * massFactor;
+                
+                // Возвращаем в км/ч для отображения, но для физики оставляем м/с
+                return {
+                    ms: v_ms,
+                    kmh: v_ms * 3.6
+                };
+            }
+
+            // ========== ФУНКЦИЯ ДЛЯ ОПРЕДЕЛЕНИЯ РАДИУСА ПОВОРОТОВ ==========
+            function getCornerRadiiFromPoints(points, numTurns) {
+                // Упрощенная оценка - используем средний радиус из генератора
+                // В реальности нужно анализировать кривизну трассы
+                const avgRadius = 40; // Берем из параметров генерации
+                const radii = [];
+                for (let i = 0; i < numTurns; i++) {
+                    // Добавляем небольшую вариацию для разнообразия
+                    radii.push(avgRadius * (0.8 + Math.random() * 0.4));
+                }
+                return radii;
+            }
+
+            function getTrackData() {
+                return {
+                    name: document.getElementById('trackName').value || "Трасса",
+                    type: document.getElementById('trackTypeSelect').value,
+                    length: parseFloat(document.getElementById('trackLength').value) || 1800,
+                    turns: parseInt(document.getElementById('trackTurns').value) || 8,
+                    width: parseFloat(document.getElementById('trackWidth').value) || 10,
+                    grip: parseFloat(document.getElementById('grip').value) || 1.0,
+                    centerLine: trackConfig.centerLine,
+                    cornerRadii: trackConfig.cornerRadii
+                };
+            }
+
+            function tireToDiameter(tireStr) {
+                let match = tireStr.match(/(\d+)[\/\s](\d+)\s*R?\s*(\d+)/i);
+                if (!match) return 0.62;
+                let width = parseInt(match[1]), profile = parseInt(match[2]), rim = parseInt(match[3]);
+                let profileHeight = width * profile / 100;
+                let diameterMm = (rim * 25.4) + (profileHeight * 2);
+                return diameterMm / 1000;
+            }
+
+            function calculateTrackLength(points) {
+                if (!points || points.length < 2) return 1800;
+                
+                let totalLength = 0;
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    totalLength += Math.sqrt(dx * dx + dy * dy);
+                }
+                
+                const p1 = points[points.length - 1];
+                const p2 = points[0];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                totalLength += Math.sqrt(dx * dx + dy * dy);
+                
+                return Math.round(totalLength * 2.5);
+            }
+
+            function getTrackPosition(progress, points) {
+                if (!points || points.length < 2) return {x: 100, y: 100};
+                
+                while (progress < 0) progress += 1;
+                while (progress > 1) progress -= 1;
+                
+                let totalLength = 0;
+                const segmentLengths = [];
+                
+                for (let i = 0; i < points.length - 1; i++) {
+                    const p1 = points[i];
+                    const p2 = points[i + 1];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    segmentLengths.push(len);
+                    totalLength += len;
+                }
+                
+                const pLast = points[points.length - 1];
+                const pFirst = points[0];
+                const dxLast = pFirst.x - pLast.x;
+                const dyLast = pFirst.y - pLast.y;
+                const lastSegmentLength = Math.sqrt(dxLast * dxLast + dyLast * dyLast);
+                segmentLengths.push(lastSegmentLength);
+                totalLength += lastSegmentLength;
+                
+                const targetDist = progress * totalLength;
+                
+                let accumulatedDist = 0;
+                
+                for (let i = 0; i < points.length; i++) {
+                    const segLen = segmentLengths[i];
+                    
+                    if (targetDist <= accumulatedDist + segLen) {
+                        const t = (targetDist - accumulatedDist) / segLen;
+                        
+                        if (i < points.length - 1) {
+                            const p1 = points[i];
+                            const p2 = points[i + 1];
+                            return {
+                                x: p1.x + (p2.x - p1.x) * t,
+                                y: p1.y + (p2.y - p1.y) * t
+                            };
+                        } else {
+                            const p1 = points[points.length - 1];
+                            const p2 = points[0];
+                            return {
+                                x: p1.x + (p2.x - p1.x) * t,
+                                y: p1.y + (p2.y - p1.y) * t
+                            };
+                        }
+                    }
+                    
+                    accumulatedDist += segLen;
+                }
+                
+                return points[0];
+            }
+
+            function drawTrackSmooth(ctx, points, roadWidth, isPreview = false) {
+                const W = isPreview ? 400 : 800;
+                const H = isPreview ? 300 : 600;
+                
+                ctx.fillStyle = '#2d7a3e';
+                ctx.fillRect(0, 0, W, H);
+                
+                ctx.fillStyle = '#3d8a4e';
+                for (let i = 0; i < 20; i++) {
+                    const x = (i * 137) % W;
+                    const y = (i * 89) % H;
+                    if (i % 3 === 0) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + 10, y + 10);
+                        ctx.lineTo(x - 10, y + 10);
+                        ctx.closePath();
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(x, y, 15, 6);
+                    }
+                }
+                
+                if (!points || points.length < 2) return;
+                
+                ctx.strokeStyle = '#f4a460';
+                ctx.lineWidth = roadWidth + 10;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                ctx.beginPath();
+                ctx.moveTo(points[0].x, points[0].y);
+                
+                for (let i = 1; i < points.length; i++) {
+                    ctx.lineTo(points[i].x, points[i].y);
+                }
+                
+                ctx.lineTo(points[0].x, points[0].y);
+                ctx.stroke();
+                
+                ctx.strokeStyle = '#2a2a2a';
+                ctx.lineWidth = roadWidth;
+                ctx.stroke();
+                
+                ctx.strokeStyle = '#f4a460';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([15, 15]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                const startPos = points[0];
+                ctx.save();
+                ctx.translate(startPos.x, startPos.y);
+                
+                const checkSize = 6;
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 3; j++) {
+                        ctx.fillStyle = (i + j) % 2 === 0 ? '#000' : '#fff';
+                        ctx.fillRect(-checkSize * 2 + i * checkSize, -checkSize * 1.5 + j * checkSize, checkSize, checkSize);
+                    }
+                }
+                
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.shadowColor = '#000';
+                ctx.shadowBlur = 4;
+                ctx.fillText('S/F', -12, -15);
+                ctx.shadowBlur = 0;
+                
+                ctx.restore();
+            }
+
+            // ========== ФИЗИКА ДВИГАТЕЛЯ ==========
+            function getEngineTorque(car, rpm) {
+                const maxRpm = 7000;
+                let powerFactor = 0;
+                const normRpmForPower = rpm / car.powerRpm;
+                
+                if (rpm < car.powerRpm) {
+                    const lowEndRatio = car.powerRpm > car.torqueRpm ? car.torqueRpm / car.powerRpm : 0.7;
+                    if (normRpmForPower < lowEndRatio) {
+                        powerFactor = normRpmForPower / lowEndRatio;
+                    } else {
+                        const progress = (normRpmForPower - lowEndRatio) / (1 - lowEndRatio);
+                        powerFactor = lowEndRatio + (1 - lowEndRatio) * Math.pow(progress, 0.8);
+                    }
+                } else {
+                    const dropOff = (rpm - car.powerRpm) / (maxRpm - car.powerRpm);
+                    powerFactor = 1.0 - 0.4 * dropOff;
+                }
+                
+                powerFactor = Math.max(0.2, Math.min(1.05, powerFactor));
+                const currentPowerHP = car.power * powerFactor;
+                
+                if (rpm < 100) return car.torque * 0.8;
+                let torqueNm = (currentPowerHP * 7120) / rpm;
+                torqueNm = Math.min(torqueNm, car.torque * 1.2);
+                
+                return torqueNm;
+            }
+
+            function calcRpmFromSpeed(car, speedMs, gear) {
+                if (gear < 1 || speedMs < 0.1) return 900;
+                const gears = car.gearRatios;
+                if (!gears.length || gear > gears.length) return 900;
+                
+                const gearIdx = gear - 1;
+                const totalRatio = gears[gearIdx] * car.finalDrive;
+                const wheelDiam = tireToDiameter(car.tire);
+                
+                let rpm = (speedMs * totalRatio * 60) / (Math.PI * wheelDiam);
+                return Math.max(800, Math.min(7200, rpm));
+            }
+
+            function calcAcceleration(car, speedMs, currentGear, isBraking = false, brakeIntensity = 0) {
+                if (currentGear < 1) currentGear = 1;
+                const gears = car.gearRatios;
+                if (!gears.length || currentGear > gears.length) return 0;
+                
+                const gearIdx = currentGear - 1;
+                const totalRatio = gears[gearIdx] * car.finalDrive;
+                const wheelDiam = tireToDiameter(car.tire);
+                const wheelRadius = wheelDiam / 2;
+                
+                const rpm = calcRpmFromSpeed(car, speedMs, currentGear);
+                const engineTorque = getEngineTorque(car, rpm);
+                const wheelTorque = engineTorque * totalRatio * 0.85;
+                
+                let tractionForce = wheelTorque / wheelRadius;
+                const maxTraction = car.mass * 9.81 * 0.85;
+                tractionForce = Math.min(tractionForce, maxTraction);
+                
+                const airDensity = 1.225;
+                const dragCd = car.body === 'suv' ? 0.38 : 0.32;
+                const frontalArea = car.body === 'suv' ? 2.4 : 2.1;
+                const dragForce = 0.5 * airDensity * dragCd * frontalArea * speedMs * speedMs;
+                
+                const rollingForce = 0.015 * car.mass * 9.81;
+                let netForce = tractionForce - dragForce - rollingForce;
+                
+                if (isBraking && brakeIntensity > 0) {
+                    const brakeForce = car.mass * 7.5 * brakeIntensity;
+                    netForce -= brakeForce;
+                }
+                
+                let acc = netForce / car.mass;
+                return Math.max(-10, Math.min(4.5, acc));
+            }
+            
+            function updateGear(car, speedMs, currentGear) {
+                const gears = car.gearRatios;
+                if (!gears.length) return 1;
+                
+                const currentRpm = calcRpmFromSpeed(car, speedMs, currentGear);
+                let newGear = currentGear;
+                
+                const shiftPoint = car.powerRpm + 200; 
+                const downShiftPoint = Math.max(2500, car.torqueRpm - 1000);
+                
+                if (currentRpm >= shiftPoint && currentGear < gears.length) {
+                    newGear = currentGear + 1;
+                }
+                else if (currentRpm <= downShiftPoint && currentGear > 1) {
+                    newGear = currentGear - 1;
+                }
+                
+                return Math.max(1, Math.min(newGear, gears.length));
+            }
+
+            // ========== ОБНОВЛЕННАЯ ФУНКЦИЯ ТОРМОЖЕНИЯ ==========
+            function getBrakeIntensity(car, speedMs, distanceToCorner, targetSpeedMs) {
+                if (speedMs <= targetSpeedMs || distanceToCorner <= 0) return 0;
+                
+                // Динамический расчет торможения
+                const speedDiff = speedMs * speedMs - targetSpeedMs * targetSpeedMs;
+                const neededDecel = speedDiff / (2 * distanceToCorner);
+                
+                // Максимальное замедление зависит от сцепления
+                const maxDecel = 7.5 * trackConfig.grip;
+                
+                const intensity = Math.min(1.0, neededDecel / maxDecel);
+                return Math.max(0, intensity);
+            }
+
+            // ========== СОСТОЯНИЕ СИМУЛЯЦИИ ==========
+            let simRunning = false;
+            let posA = 0, posB = 0;
+            let speedA = 0, speedB = 0;
+            let gearA = 1, gearB = 1;
+            const dt = 0.05;
+            
+            let lapTimeA = 0, lapTimeB = 0;
+            let lastLapTimeA = 0, lastLapTimeB = 0;
+            let bestLapA = Infinity, bestLapB = Infinity;
+            let lapStartTimeA = 0, lapStartTimeB = 0;
+            let lastPosA = 0, lastPosB = 0;
+            let simElapsedTime = 0;
+            
+            let reached100A = false;
+            let reached100B = false;
+            let timeTo100A = null;
+            let timeTo100B = null;
+            const SPEED_100_KMH = 27.78;
+            
+            const canvas = document.getElementById('trackCanvas');
+            const ctx = canvas.getContext('2d');
+            const previewCanvas = document.getElementById('trackPreviewCanvas');
+            const previewCtx = previewCanvas.getContext('2d');
+            
+            const speedASpan = document.getElementById('speedA');
+            const speedBSpan = document.getElementById('speedB');
+            const gearASpan = document.getElementById('gearA');
+            const gearBSpan = document.getElementById('gearB');
+            const rpmASpan = document.getElementById('rpmA');
+            const rpmBSpan = document.getElementById('rpmB');
+            const nameDisplayA = document.getElementById('nameDisplayA');
+            const nameDisplayB = document.getElementById('nameDisplayB');
+            const liveWinner = document.getElementById('liveWinner');
+            const gapValueEl = document.getElementById('gapValue');
+            const gapLeaderEl = document.getElementById('gapLeader');
+            const trackInfoEl = document.getElementById('trackInfo');
+            
+            const avgSpeedAEl = document.getElementById('avgSpeedA');
+            const avgSpeedBEl = document.getElementById('avgSpeedB');
+            const bestLapAEl = document.getElementById('bestLapA');
+            const bestLapBEl = document.getElementById('bestLapB');
+            const accel0to100AEl = document.getElementById('accel0to100A');
+            const accel0to100BEl = document.getElementById('accel0to100B');
+            const lapTitleAEl = document.getElementById('lapTitleA');
+            const lapTitleBEl = document.getElementById('lapTitleB');
+
+            function formatTime(seconds) {
+                if (seconds === Infinity || seconds === null || seconds <= 0) return '--:--.--';
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                const ms = Math.floor((seconds % 1) * 100);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+            }
+
+            function formatAccelTime(seconds) {
+                if (seconds === null || seconds === undefined) return '--.-- с';
+                return seconds.toFixed(2) + ' с';
+            }
+
+            function drawCars(nameA, nameB) {
+                const posANorm = posA / trackConfig.length;
+                const posBNorm = posB / trackConfig.length;
+                
+                const pA = getTrackPosition(posANorm, trackConfig.centerLine);
+                const pB = getTrackPosition(posBNorm, trackConfig.centerLine);
+                
+                const offset = -8;
+                const offsetB = 8;
+                
+                ctx.save();
+                ctx.translate(pA.x, pA.y + offset);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(-12, -6, 24, 12);
+                ctx.fillStyle = '#ff4444';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 8px sans-serif';
+                ctx.fillText(nameA.charAt(0).toUpperCase(), -3, 3);
+                ctx.restore();
+                
+                ctx.save();
+                ctx.translate(pB.x, pB.y + offsetB);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.fillRect(-12, -6, 24, 12);
+                ctx.fillStyle = '#4488ff';
+                ctx.beginPath();
+                ctx.ellipse(0, 0, 12, 6, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 8px sans-serif';
+                ctx.fillText(nameB.charAt(0).toUpperCase(), -3, 3);
+                ctx.restore();
+            }
+
+            // ========== ОБНОВЛЕННАЯ ЛОГИКА ПОВОРОТОВ ==========
+            function updateSim() {
+                if (!simRunning) return;
+                const carA = getCarAData(), carB = getCarBData();
+                
+                nameDisplayA.innerText = carA.name;
+                nameDisplayB.innerText = carB.name;
+                lapTitleAEl.innerText = carA.name;
+                lapTitleBEl.innerText = carB.name;
+                
+                const trackLength = trackConfig.length;
+                const posANorm = posA / trackLength;
+                const posBNorm = posB / trackLength;
+                
+                simElapsedTime += dt;
+                
+                if (!reached100A && speedA >= SPEED_100_KMH) {
+                    reached100A = true;
+                    timeTo100A = simElapsedTime;
+                    accel0to100AEl.innerText = formatAccelTime(timeTo100A);
+                }
+                
+                if (!reached100B && speedB >= SPEED_100_KMH) {
+                    reached100B = true;
+                    timeTo100B = simElapsedTime;
+                    accel0to100BEl.innerText = formatAccelTime(timeTo100B);
+                }
+                
+                const prevPosNormA = (lastPosA % trackLength) / trackLength;
+                const prevPosNormB = (lastPosB % trackLength) / trackLength;
+                
+                if (prevPosNormA > 0.9 && posANorm < 0.1) {
+                    if (lapStartTimeA > 0) {
+                        lapTimeA = simElapsedTime - lapStartTimeA;
+                        lastLapTimeA = lapTimeA;
+                        if (lapTimeA < bestLapA) {
+                            bestLapA = lapTimeA;
+                        }
+                        const avgSpeedMs = trackLength / lapTimeA;
+                        avgSpeedAEl.innerText = Math.round(avgSpeedMs * 3.6) + ' км/ч';
+                        bestLapAEl.innerText = formatTime(bestLapA);
+                    }
+                    lapStartTimeA = simElapsedTime;
+                }
+                
+                if (prevPosNormB > 0.9 && posBNorm < 0.1) {
+                    if (lapStartTimeB > 0) {
+                        lapTimeB = simElapsedTime - lapStartTimeB;
+                        lastLapTimeB = lapTimeB;
+                        if (lapTimeB < bestLapB) {
+                            bestLapB = lapTimeB;
+                        }
+                        const avgSpeedMs = trackLength / lapTimeB;
+                        avgSpeedBEl.innerText = Math.round(avgSpeedMs * 3.6) + ' км/ч';
+                        bestLapBEl.innerText = formatTime(bestLapB);
+                    }
+                    lapStartTimeB = simElapsedTime;
+                }
+                
+                lastPosA = posA;
+                lastPosB = posB;
+                
+                let brakeA = false, brakeB = false;
+                let brakeIntensityA = 0, brakeIntensityB = 0;
+                
+                // ОБНОВЛЕННАЯ ЛОГИКА ПОВОРОТОВ
+                if (trackConfig.type === 'twisty' && trackConfig.cornerRadii.length > 0) {
+                    for (let i = 0; i < trackConfig.turns; i++) {
+                        // Позиция поворота на трассе
+                        const turnPos = (i + 0.3) / trackConfig.turns;
+                        const radius = trackConfig.cornerRadii[i % trackConfig.cornerRadii.length];
+                        
+                        // Рассчитываем целевую скорость для каждого автомобиля
+                        const targetSpeedA = calculateCornerSpeed(carA.mass, radius, trackConfig.grip);
+                        const targetSpeedB = calculateCornerSpeed(carB.mass, radius, trackConfig.grip);
+                        
+                        // Расстояние до поворота для авто А
+                        let distToTurnA = turnPos - posANorm;
+                        if (distToTurnA < 0) distToTurnA += 1;
+                        const distMetersA = distToTurnA * trackLength;
+                        
+                        // Расстояние до поворота для авто Б
+                        let distToTurnB = turnPos - posBNorm;
+                        if (distToTurnB < 0) distToTurnB += 1;
+                        const distMetersB = distToTurnB * trackLength;
+                        
+                        // Зона торможения зависит от скорости (чем быстрее, тем раньше тормозим)
+                        const brakeZoneA = Math.min(150, Math.max(50, speedA * 3.6 * 2));
+                        const brakeZoneB = Math.min(150, Math.max(50, speedB * 3.6 * 2));
+                        
+                        // Торможение для авто А
+                        if (distMetersA < brakeZoneA && distMetersA > 0 && speedA > targetSpeedA.ms) {
+                            brakeA = true;
+                            brakeIntensityA = getBrakeIntensity(carA, speedA, distMetersA, targetSpeedA.ms);
+                        }
+                        
+                        // Торможение для авто Б
+                        if (distMetersB < brakeZoneB && distMetersB > 0 && speedB > targetSpeedB.ms) {
+                            brakeB = true;
+                            brakeIntensityB = getBrakeIntensity(carB, speedB, distMetersB, targetSpeedB.ms);
+                        }
+                        
+                        // Отключаем торможение после прохождения поворота
+                        if (Math.abs(posANorm - (turnPos + 0.1)) < 0.05) brakeA = false;
+                        if (Math.abs(posBNorm - (turnPos + 0.1)) < 0.05) brakeB = false;
+                    }
+                }
+                
+                const accA = calcAcceleration(carA, speedA, gearA, brakeA, brakeIntensityA);
+                const accB = calcAcceleration(carB, speedB, gearB, brakeB, brakeIntensityB);
+                
+                const maxSpeed = trackConfig.type === 'drag' ? 70 : 60;
+                speedA = Math.max(0, Math.min(maxSpeed, speedA + accA * dt));
+                speedB = Math.max(0, Math.min(maxSpeed, speedB + accB * dt));
+                
+                posA += speedA * dt;
+                posB += speedB * dt;
+                
+                if (posA > trackLength) posA -= trackLength;
+                if (posB > trackLength) posB -= trackLength;
+                
+                gearA = updateGear(carA, speedA, gearA);
+                gearB = updateGear(carB, speedB, gearB);
+                
+                const rpmA = calcRpmFromSpeed(carA, speedA, gearA);
+                const rpmB = calcRpmFromSpeed(carB, speedB, gearB);
+                
+                speedASpan.innerText = Math.round(speedA * 3.6);
+                speedBSpan.innerText = Math.round(speedB * 3.6);
+                gearASpan.innerText = gearA;
+                gearBSpan.innerText = gearB;
+                rpmASpan.innerText = Math.round(rpmA);
+                rpmBSpan.innerText = Math.round(rpmB);
+                
+                let gap = Math.abs(posA - posB);
+                if (gap > trackLength / 2) {
+                    gap = trackLength - gap;
+                }
+                gapValueEl.innerText = Math.round(gap);
+                
+                if (posA > posB) {
+                    gapLeaderEl.innerText = '← ' + carA.name + ' впереди';
+                    gapLeaderEl.style.color = '#ff8a8a';
+                } else if (posB > posA) {
+                    gapLeaderEl.innerText = carB.name + ' впереди →';
+                    gapLeaderEl.style.color = '#8ab8ff';
+                } else {
+                    gapLeaderEl.innerText = 'Поровну';
+                    gapLeaderEl.style.color = '#ffcf8a';
+                }
+                
+                if (posA > posB) liveWinner.innerText = '👑 Лидирует ' + carA.name;
+                else if (posB > posA) liveWinner.innerText = '👑 Лидирует ' + carB.name;
+                else liveWinner.innerText = '🤝 Равны';
+                
+                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                drawCars(carA.name, carB.name);
+            }
+
+            function updateTrackPreview() {
+                const type = document.getElementById('trackTypeSelect').value;
+                const length = document.getElementById('trackLength').value;
+                const turns = document.getElementById('trackTurns').value;
+                
+                trackInfoEl.innerText = `Тип: ${type === 'drag' ? 'Драг' : type === 'oval' ? 'Овал' : 'Извилистая'} • ${length}м • ${turns} пов.`;
+                
+                previewCtx.clearRect(0, 0, 400, 300);
+                
+                if (trackConfig.centerLine && trackConfig.centerLine.length > 0) {
+                    const scaleX = 400 / 800;
+                    const scaleY = 300 / 600;
+                    const previewPoints = trackConfig.centerLine.map(p => ({
+                        x: p.x * scaleX,
+                        y: p.y * scaleY
+                    }));
+                    
+                    const tempCtx = previewCtx;
+                    tempCtx.fillStyle = '#2d7a3e';
+                    tempCtx.fillRect(0, 0, 400, 300);
+                    
+                    tempCtx.strokeStyle = '#f4a460';
+                    tempCtx.lineWidth = 20;
+                    tempCtx.lineCap = 'round';
+                    tempCtx.lineJoin = 'round';
+                    
+                    tempCtx.beginPath();
+                    tempCtx.moveTo(previewPoints[0].x, previewPoints[0].y);
+                    for (let i = 1; i < previewPoints.length; i++) {
+                        tempCtx.lineTo(previewPoints[i].x, previewPoints[i].y);
+                    }
+                    tempCtx.lineTo(previewPoints[0].x, previewPoints[0].y);
+                    tempCtx.stroke();
+                    
+                    tempCtx.strokeStyle = '#2a2a2a';
+                    tempCtx.lineWidth = 15;
+                    tempCtx.stroke();
+                    
+                    const startPos = previewPoints[0];
+                    tempCtx.save();
+                    tempCtx.translate(startPos.x, startPos.y);
+                    tempCtx.fillStyle = '#fff';
+                    tempCtx.font = 'bold 8px sans-serif';
+                    tempCtx.fillText('S', -5, -8);
+                    tempCtx.restore();
+                }
+            }
+
+            let intervalId = null;
+            function startSim() {
+                if (intervalId) clearInterval(intervalId);
+                simRunning = true;
+                intervalId = setInterval(updateSim, dt * 1000);
+            }
+            function pauseSim() {
+                simRunning = false;
+                if (intervalId) clearInterval(intervalId);
+                intervalId = null;
+            }
+            function resetSim() {
+                pauseSim();
+                posA = posB = speedA = speedB = 0;
+                gearA = gearB = 1;
+                simElapsedTime = 0;
+                lapTimeA = lapTimeB = 0;
+                lastLapTimeA = lastLapTimeB = 0;
+                bestLapA = bestLapB = Infinity;
+                lapStartTimeA = lapStartTimeB = 0;
+                lastPosA = lastPosB = 0;
+                
+                reached100A = false;
+                reached100B = false;
+                timeTo100A = null;
+                timeTo100B = null;
+                
+                avgSpeedAEl.innerText = '0 км/ч';
+                avgSpeedBEl.innerText = '0 км/ч';
+                bestLapAEl.innerText = '--:--.--';
+                bestLapBEl.innerText = '--:--.--';
+                accel0to100AEl.innerText = '--.-- с';
+                accel0to100BEl.innerText = '--.-- с';
+                
+                updateSim();
+                liveWinner.innerText = 'Гонка: сброс';
+                document.getElementById('startSimBtn').innerText = '▶ СТАРТ';
+            }
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.onclick = e => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                    document.getElementById(btn.dataset.tab + '-panel').classList.add('active');
+                };
+            });
+
+            function saveCar(carData, suffix) {
+                const a = document.createElement('a');
+                const fileName = (carData.name.replace(/[^a-z0-9а-я]/gi, '_') || 'car') + '_' + suffix + '.json';
+                a.href = URL.createObjectURL(new Blob([JSON.stringify(carData)], {type:'application/json'}));
+                a.download = fileName;
+                a.click();
+            }
+            
+            function loadCar(fileInput, prefix) {
+                const file = fileInput.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const car = JSON.parse(ev.target.result);
+                        if(car.name) document.getElementById(prefix+'_name').value = car.name;
+                        if(car.power) document.getElementById(prefix+'_power').value = car.power;
+                        if(car.powerRpm) document.getElementById(prefix+'_powerRpm').value = car.powerRpm;
+                        if(car.torque) document.getElementById(prefix+'_torque').value = car.torque;
+                        if(car.torqueRpm) document.getElementById(prefix+'_torqueRpm').value = car.torqueRpm;
+                        if(car.mass) document.getElementById(prefix+'_mass').value = car.mass;
+                        if(car.gearRatios) document.getElementById(prefix+'_gears').value = car.gearRatios.join(';');
+                        if(car.finalDrive) document.getElementById(prefix+'_final').value = car.finalDrive;
+                        if(car.tire) document.getElementById(prefix+'_tire').value = car.tire;
+                        if(car.body) document.getElementById(prefix+'_body').value = car.body;
+                        alert(`Загружено: ${car.name || 'Автомобиль'}`);
+                        updateSim();
+                    } catch(er) { alert('Ошибка JSON'); }
+                };
+                reader.readAsText(file);
+            }
+            
+            document.getElementById('saveBtnA').onclick = () => saveCar(getCarAData(), 'A');
+            document.getElementById('loadBtnA').onclick = () => document.getElementById('loadFileA').click();
+            document.getElementById('loadFileA').onchange = (e) => loadCar(e.target, 'a');
+            
+            document.getElementById('saveBtnB').onclick = () => saveCar(getCarBData(), 'B');
+            document.getElementById('loadBtnB').onclick = () => document.getElementById('loadFileB').click();
+            document.getElementById('loadFileB').onchange = (e) => loadCar(e.target, 'b');
+
+            document.getElementById('saveTrackBtn').onclick = () => {
+                if (!trackConfig.centerLine || trackConfig.centerLine.length === 0) {
+                    alert('Сначала сгенерируйте трассу!');
+                    return;
+                }
+                
+                let csv = "x,y\n";
+                trackConfig.centerLine.forEach(p => {
+                    csv += `${p.x.toFixed(2)},${p.y.toFixed(2)}\n`;
+                });
+                
+                const trackData = getTrackData();
+                const a = document.createElement('a');
+                const fileName = (trackData.name.replace(/[^a-z0-9а-я]/gi, '_') || 'track') + '.csv';
+                a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+                a.download = fileName;
+                a.click();
+            };
+            
+            document.getElementById('loadTrackBtn').onclick = () => document.getElementById('loadTrackFile').click();
+            document.getElementById('loadTrackFile').onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = ev => {
+                    try {
+                        const lines = ev.target.result.split('\n');
+                        const points = [];
+                        
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (!line) continue;
+                            
+                            const parts = line.split(',');
+                            if (parts.length >= 2) {
+                                const x = parseFloat(parts[0]);
+                                const y = parseFloat(parts[1]);
+                                if (!isNaN(x) && !isNaN(y)) {
+                                    points.push({ x, y });
+                                }
+                            }
+                        }
+                        
+                        if (points.length < 3) {
+                            alert('Недостаточно точек в файле');
+                            return;
+                        }
+                        
+                        trackConfig.name = "Загруженная трасса";
+                        trackConfig.type = "twisty";
+                        trackConfig.turns = Math.floor(points.length / 20);
+                        trackConfig.centerLine = points;
+                        trackConfig.cornerRadii = getCornerRadiiFromPoints(points, trackConfig.turns);
+                        trackConfig.length = calculateTrackLength(points);
+                        
+                        document.getElementById('trackName').value = trackConfig.name;
+                        document.getElementById('trackTypeSelect').value = trackConfig.type;
+                        document.getElementById('trackLength').value = trackConfig.length;
+                        document.getElementById('trackTurns').value = trackConfig.turns;
+                        
+                        alert(`Загружена трасса с ${points.length} точками`);
+                        updateTrackPreview();
+                        drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                        resetSim();
+                        
+                    } catch(er) {
+                        alert('Ошибка загрузки CSV: ' + er.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            document.getElementById('resetParams').onclick = () => {
+                document.getElementById('a_name').value='LADA Vesta 1.6 2016';
+                document.getElementById('a_power').value='106';document.getElementById('a_powerRpm').value='5800';
+                document.getElementById('a_torque').value='148';document.getElementById('a_torqueRpm').value='4200';
+                document.getElementById('a_mass').value='1220';
+                document.getElementById('a_gears').value='3.727;2.048;1.393;1.029;0.795';document.getElementById('a_final').value='3.867';
+                document.getElementById('a_tire').value='195/55 R16';document.getElementById('a_body').value='sedan';
+                
+                document.getElementById('b_name').value='Skoda Yeti 1.2 TSI';
+                document.getElementById('b_power').value='105';document.getElementById('b_powerRpm').value='5000';
+                document.getElementById('b_torque').value='175';document.getElementById('b_torqueRpm').value='4100';
+                document.getElementById('b_mass').value='1370';
+                document.getElementById('b_gears').value='3.615;1.955;1.281;0.973;0.778;0.646';document.getElementById('b_final').value='4.353';
+                document.getElementById('b_tire').value='215/60 R16';document.getElementById('b_body').value='suv';
+                updateSim();
+            };
+            
+            document.getElementById('generateTrackBtn').onclick = () => {
+                const turns = parseInt(document.getElementById('genTurns').value) || 12;
+                const curvature = parseInt(document.getElementById('genCurvature').value) || 100;
+                const cornerRadius = parseInt(document.getElementById('cornerRadius').value) || 40;
+                
+                trackGenerator = new TrackGenerator(800, 600);
+                const result = trackGenerator.generateCenterLine(turns, curvature, cornerRadius);
+                
+                trackConfig.name = "Сгенерированная трасса";
+                trackConfig.type = "twisty";
+                trackConfig.turns = turns;
+                trackConfig.centerLine = result.points;
+                trackConfig.cornerRadii = result.radii;
+                trackConfig.length = calculateTrackLength(result.points);
+                
+                document.getElementById('trackName').value = trackConfig.name;
+                document.getElementById('trackTypeSelect').value = trackConfig.type;
+                document.getElementById('trackLength').value = trackConfig.length;
+                document.getElementById('trackTurns').value = trackConfig.turns;
+                
+                resetSim();
+                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                updateTrackPreview();
+            };
+            
+            document.getElementById('applyTrackBtn').onclick = () => {
+                trackConfig.name = document.getElementById('trackName').value || "Трасса";
+                trackConfig.type = document.getElementById('trackTypeSelect').value;
+                trackConfig.length = parseFloat(document.getElementById('trackLength').value) || 1800;
+                trackConfig.turns = parseInt(document.getElementById('trackTurns').value) || 8;
+                trackConfig.width = parseFloat(document.getElementById('trackWidth').value) || 10;
+                trackConfig.grip = parseFloat(document.getElementById('grip').value) || 1.0;
+                
+                resetSim();
+                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                updateTrackPreview();
+            };
+            
+            document.getElementById('trackTypeSelect').onchange = updateTrackPreview;
+            document.getElementById('trackTurns').onchange = updateTrackPreview;
+            document.getElementById('trackLength').onchange = updateTrackPreview;
+            
+            document.getElementById('startSimBtn').onclick = () => {
+                if (simRunning) {
+                    pauseSim();
+                    document.getElementById('startSimBtn').innerText = '▶ СТАРТ';
+                } else {
+                    startSim();
+                    document.getElementById('startSimBtn').innerText = '⏸ ПАУЗА';
+                }
+            };
+            document.getElementById('resetSimBtn').onclick = resetSim;
+            
+            // Инициализация
+            trackGenerator = new TrackGenerator(800, 600);
+            const result = trackGenerator.generateCenterLine(12, 100, 40);
+            trackConfig.centerLine = result.points;
+            trackConfig.cornerRadii = result.radii;
+            trackConfig.length = calculateTrackLength(trackConfig.centerLine);
+            document.getElementById('trackLength').value = trackConfig.length;
+            document.getElementById('trackTurns').value = 12;
+            
+            updateTrackPreview();
+            drawTrackSmooth(ctx, trackConfig.centerLine, 30);
+            resetSim();
+        })();
+    </script>
+</body>
+</html>
