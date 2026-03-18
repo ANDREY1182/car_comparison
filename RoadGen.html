@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Генератор гоночных трасс</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            padding: 10px;
+            background: #1a1a1a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            width: 100vw;
+            overflow-x: hidden;
+        }
+        .controls {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #ff0000;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            min-width: 120px;
+        }
+        button:active {
+            background: #cc0000;
+        }
+        label {
+            color: #fff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        input[type="number"] {            width: 70px;
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+        }
+        select {
+            padding: 8px;
+            font-size: 16px;
+            border: 1px solid #444;
+            border-radius: 5px;
+            background: #333;
+            color: #fff;
+        }
+        #trackCanvas {
+            border: 2px solid #444;
+            background: #000;
+            max-width: 100%;
+            width: auto;
+        }
+        #csvOutput {
+            margin-top: 10px;
+            padding: 10px;
+            background: #222;
+            color: #0f0;
+            font-family: monospace;
+            font-size: 12px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 150px;
+            overflow: auto;
+            border: 1px solid #444;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .label {
+            color: #fff;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button onclick="generateTrack()">Сгенерировать</button>
+        <label>
+            Тип:
+            <select id="trackType">                <option value="simple">Простая</option>
+                <option value="figure8" selected>Восьмёрка</option>
+                <option value="complex">Сложная</option>
+            </select>
+        </label>
+        <label>
+            Повороты:
+            <input type="number" id="numTurns" min="3" max="30" value="12">
+        </label>
+        <label>
+            Кривизна:
+            <input type="number" id="curvatureCoeff" min="0" max="100" step="10" value="80">
+        </label>
+        <label>
+            Мин. радиус:
+            <input type="number" id="minRadius" min="10" max="100" value="30">
+        </label>
+        <label>
+            <input type="checkbox" id="showFrame" checked>
+            Каркас
+        </label>
+        <button onclick="downloadTrack()">Сохранить</button>
+    </div>
+    <canvas id="trackCanvas"></canvas>
+    <div class="label">CSV код трассы:</div>
+    <div id="csvOutput"></div>
+
+    <script>
+        const canvas = document.getElementById('trackCanvas');
+        const ctx = canvas.getContext('2d');
+        let currentTrack = null;
+        
+        function resizeCanvas() {
+            const maxWidth = Math.min(window.innerWidth - 20, 600);
+            const size = maxWidth;
+            canvas.width = size;
+            canvas.height = size;
+        }
+        
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        class TrackGenerator {
+            constructor(width, height) {
+                this.width = width;
+                this.height = height;
+                this.padding = 60;
+            }
+
+            generatePolygon(numCorners, curvatureCoeff, trackType) {                const points = [];
+                const centerX = this.width / 2;
+                const centerY = this.height / 2;
+                const baseRadius = Math.min(this.width, this.height) / 3;
+                
+                const maxVariation = baseRadius * (curvatureCoeff / 100);
+                const maxRadius = Math.min(this.width, this.height) / 2 - this.padding;
+                
+                if (trackType === 'figure8') {
+                    const halfPoints = Math.floor(numCorners / 2);
+                    
+                    for (let i = 0; i < halfPoints; i++) {
+                        const angle = (i / halfPoints) * Math.PI * 2;
+                        const radiusVariation = (Math.random() - 0.5) * 2 * maxVariation * 0.5;
+                        let radius = baseRadius * 0.6 + radiusVariation;
+                        radius = Math.min(radius, maxRadius * 0.7);
+                        radius = Math.max(radius, this.padding);
+                        
+                        const offsetX = Math.cos(angle) * radius;
+                        const offsetY = Math.sin(angle) * radius - baseRadius * 0.3;
+                        
+                        let x = centerX + offsetX;
+                        let y = centerY + offsetY;
+                        
+                        x = Math.max(this.padding, Math.min(this.width - this.padding, x));
+                        y = Math.max(this.padding, Math.min(this.height - this.padding, y));
+                        
+                        points.push({ x, y });
+                    }
+                    
+                    points.push({ 
+                        x: centerX + (Math.random() - 0.5) * 40, 
+                        y: centerY + (Math.random() - 0.5) * 40 
+                    });
+                    
+                    for (let i = 0; i < halfPoints; i++) {
+                        const angle = Math.PI * 2 - (i / halfPoints) * Math.PI * 2;
+                        const radiusVariation = (Math.random() - 0.5) * 2 * maxVariation * 0.5;
+                        let radius = baseRadius * 0.6 + radiusVariation;
+                        radius = Math.min(radius, maxRadius * 0.7);
+                        radius = Math.max(radius, this.padding);
+                        
+                        const offsetX = Math.cos(angle) * radius;
+                        const offsetY = Math.sin(angle) * radius + baseRadius * 0.3;
+                        
+                        let x = centerX + offsetX;
+                        let y = centerY + offsetY;
+                        
+                        x = Math.max(this.padding, Math.min(this.width - this.padding, x));
+                        y = Math.max(this.padding, Math.min(this.height - this.padding, y));                        
+                        points.push({ x, y });
+                    }
+                    
+                } else if (trackType === 'complex') {
+                    const sections = 3;
+                    const pointsPerSection = Math.floor(numCorners / sections);
+                    
+                    for (let s = 0; s < sections; s++) {
+                        const sectionAngle = (s / sections) * Math.PI * 2;
+                        const sectionRadius = baseRadius * 0.5;
+                        const sectionCenterX = centerX + Math.cos(sectionAngle) * sectionRadius;
+                        const sectionCenterY = centerY + Math.sin(sectionAngle) * sectionRadius;
+                        
+                        for (let i = 0; i < pointsPerSection; i++) {
+                            const angle = (i / pointsPerSection) * Math.PI * 2 + sectionAngle;
+                            const radiusVariation = (Math.random() - 0.5) * 2 * maxVariation;
+                            let radius = baseRadius * 0.4 + radiusVariation;
+                            radius = Math.max(radius, this.padding * 0.5);
+                            
+                            let x = sectionCenterX + Math.cos(angle) * radius;
+                            let y = sectionCenterY + Math.sin(angle) * radius;
+                            
+                            x = Math.max(this.padding, Math.min(this.width - this.padding, x));
+                            y = Math.max(this.padding, Math.min(this.height - this.padding, y));
+                            
+                            points.push({ x, y });
+                        }
+                        
+                        if (s < sections - 1) {
+                            const nextSectionAngle = ((s + 1) / sections) * Math.PI * 2;
+                            const transitionX = centerX + Math.cos(nextSectionAngle) * sectionRadius * 0.5;
+                            const transitionY = centerY + Math.sin(nextSectionAngle) * sectionRadius * 0.5;
+                            points.push({ x: transitionX, y: transitionY });
+                        }
+                    }
+                    
+                } else {
+                    for (let i = 0; i < numCorners; i++) {
+                        const angle = (i / numCorners) * Math.PI * 2;
+                        const radiusVariation = (Math.random() - 0.5) * 2 * maxVariation;
+                        let radius = baseRadius + radiusVariation;
+                        radius = Math.min(radius, maxRadius);
+                        radius = Math.max(radius, this.padding);
+                        
+                        const angleVariation = (Math.random() - 0.5) * 0.3 * (curvatureCoeff / 50);
+                        const finalAngle = angle + angleVariation;
+                        
+                        let x = centerX + Math.cos(finalAngle) * radius;
+                        let y = centerY + Math.sin(finalAngle) * radius;                        
+                        x = Math.max(this.padding, Math.min(this.width - this.padding, x));
+                        y = Math.max(this.padding, Math.min(this.height - this.padding, y));
+                        
+                        points.push({ x, y });
+                    }
+                }
+                
+                return points;
+            }
+
+            lineIntersection(p1, v1, p2, v2) {
+                const det = v2.y * v1.x - v2.x * v1.y;
+                if (Math.abs(det) < 0.001) return null;
+                
+                const t = ((p2.x - p1.x) * v2.y - (p2.y - p1.y) * v2.x) / det;
+                
+                return {
+                    x: p1.x + v1.x * t,
+                    y: p1.y + v1.y * t
+                };
+            }
+
+            roundCorner(p0, p1, p2, minRadius) {
+                // Направления движения: p0 -> p1 -> p2
+                const dir1 = { x: p1.x - p0.x, y: p1.y - p0.y };
+                const dir2 = { x: p2.x - p1.x, y: p2.y - p1.y };
+                
+                const len1 = Math.sqrt(dir1.x * dir1.x + dir1.y * dir1.y);
+                const len2 = Math.sqrt(dir2.x * dir2.x + dir2.y * dir2.y);
+                
+                const u1 = { x: dir1.x / len1, y: dir1.y / len1 };
+                const u2 = { x: dir2.x / len2, y: dir2.y / len2 };
+                
+                const cross = u1.x * u2.y - u1.y * u2.x;
+                const turnLeft = cross > 0;
+                
+                const dot = u1.x * u2.x + u1.y * u2.y;
+                const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+                
+                // ============================================
+                // ОГРАНИЧЕНИЯ РАДИУСА:
+                // 1. Радиус не больше половины длины кратчайшего отрезка
+                // 2. Центр сопряжения не дальше 1/2 длины кратчайшего отрезка
+                //    от вершины угла (точки p1)
+                // ============================================
+                
+                const minLen = Math.min(len1, len2);
+                const maxRadiusByLength = minLen / 2;
+                const maxCenterDist = minLen / 2;                
+                // Случайный радиус
+                let radius = minRadius + Math.random() * 30;
+                
+                // Ограничение 1: радиус по длине отрезков
+                radius = Math.min(radius, maxRadiusByLength);
+                
+                // Ограничение 2: расстояние от вершины до центра
+                // centerDist = radius / sin(angle/2)
+                // Если centerDist > maxCenterDist, уменьшаем радиус
+                const sinHalfAngle = Math.sin(angle / 2);
+                if (sinHalfAngle > 0.001) {
+                    const maxRadiusByCenterDist = maxCenterDist * sinHalfAngle;
+                    radius = Math.min(radius, maxRadiusByCenterDist);
+                }
+                
+                // Применяем минимальный радиус (но не больше максимального)
+                radius = Math.max(minRadius, Math.min(radius, maxRadiusByLength));
+                if (sinHalfAngle > 0.001) {
+                    radius = Math.min(radius, maxCenterDist * sinHalfAngle);
+                }
+                
+                // Перпендикуляры к направлениям
+                const perp1 = { x: -u1.y, y: u1.x };
+                const perp2 = { x: -u2.y, y: u2.x };
+                
+                // Смещение в сторону поворота
+                const offset1 = turnLeft ? perp1 : { x: -perp1.x, y: -perp1.y };
+                const offset2 = turnLeft ? perp2 : { x: -perp2.x, y: -perp2.y };
+                
+                // Точки на вспомогательных прямых
+                const line1Point = { x: p1.x + offset1.x * radius, y: p1.y + offset1.y * radius };
+                const line2Point = { x: p1.x + offset2.x * radius, y: p1.y + offset2.y * radius };
+                
+                // Центр сопряжения
+                const center = this.lineIntersection(line1Point, u1, line2Point, u2);
+                
+                if (!center) {
+                    const offsetNorm = turnLeft ? perp1 : { x: -perp1.x, y: -perp1.y };
+                    center = {
+                        x: p1.x + offsetNorm.x * radius,
+                        y: p1.y + offsetNorm.y * radius
+                    };
+                }
+                
+                // ============================================
+                // ПРОВЕРКА: расстояние от p1 до центра
+                // ============================================
+                const centerDist = Math.sqrt(
+                    Math.pow(center.x - p1.x, 2) +                     Math.pow(center.y - p1.y, 2)
+                );
+                
+                // Если центр слишком далеко, дополнительно уменьшаем радиус
+                if (centerDist > maxCenterDist && centerDist > 0.001) {
+                    const scale = maxCenterDist / centerDist;
+                    radius = radius * scale;
+                    
+                    // Пересчитываем центр с новым радиусом
+                    const line1PointNew = { x: p1.x + offset1.x * radius, y: p1.y + offset1.y * radius };
+                    const line2PointNew = { x: p1.x + offset2.x * radius, y: p1.y + offset2.y * radius };
+                    const newCenter = this.lineIntersection(line1PointNew, u1, line2PointNew, u2);
+                    if (newCenter) {
+                        center.x = newCenter.x;
+                        center.y = newCenter.y;
+                    }
+                }
+                
+                // Точки сопряжения (проекции центра на прямые)
+                const toCenter = { x: center.x - p1.x, y: center.y - p1.y };
+                
+                const proj1 = toCenter.x * u1.x + toCenter.y * u1.y;
+                const pointA = {
+                    x: p1.x + u1.x * proj1,
+                    y: p1.y + u1.y * proj1
+                };
+                
+                const proj2 = toCenter.x * u2.x + toCenter.y * u2.y;
+                const pointB = {
+                    x: p1.x + u2.x * proj2,
+                    y: p1.y + u2.y * proj2
+                };
+                
+                // Углы для дуги
+                const startAngle = Math.atan2(pointA.y - center.y, pointA.x - center.x);
+                const endAngle = Math.atan2(pointB.y - center.y, pointB.x - center.x);
+                
+                // Направление обхода
+                const clockwise = !turnLeft;
+                
+                return {
+                    type: 'arc',
+                    center: center,
+                    radius: radius,
+                    startAngle: startAngle,
+                    endAngle: endAngle,
+                    clockwise: clockwise,
+                    startPoint: pointA,
+                    endPoint: pointB,
+                    turnLeft: turnLeft,                    len1: len1,
+                    len2: len2,
+                    centerDist: centerDist,
+                    maxCenterDist: maxCenterDist
+                };
+            }
+
+            generate(numCorners = 12, curvatureCoeff = 80, minRadius = 30, trackType = 'figure8') {
+                const polygon = this.generatePolygon(numCorners, curvatureCoeff, trackType);
+                const segments = [];
+                
+                const arcs = [];
+                for (let i = 0; i < polygon.length; i++) {
+                    const p0 = polygon[(i - 1 + polygon.length) % polygon.length];
+                    const p1 = polygon[i];
+                    const p2 = polygon[(i + 1) % polygon.length];
+                    
+                    const arc = this.roundCorner(p0, p1, p2, minRadius);
+                    arcs.push(arc);
+                }
+                
+                let csv = "type,x,y,radius,start_angle,end_angle,clockwise\n";
+                csv += `# Track parameters:\n`;
+                csv += `# turns: ${numCorners}\n`;
+                csv += `# curvature: ${curvatureCoeff}\n`;
+                csv += `# min_radius: ${minRadius}\n`;
+                csv += `# type: ${trackType}\n`;
+                
+                for (let i = 0; i < arcs.length; i++) {
+                    const arc = arcs[i];
+                    const nextArc = arcs[(i + 1) % arcs.length];
+                    
+                    segments.push({
+                        type: 'arc',
+                        ...arc
+                    });
+                    
+                    csv += `arc,${arc.center.x.toFixed(2)},${arc.center.y.toFixed(2)},${arc.radius.toFixed(2)},${arc.startAngle.toFixed(4)},${arc.endAngle.toFixed(4)},${arc.clockwise}\n`;
+                    
+                    const lineStart = arc.endPoint;
+                    const lineEnd = nextArc.startPoint;
+                    
+                    segments.push({
+                        type: 'line',
+                        start: lineStart,
+                        end: lineEnd
+                    });
+                    
+                    csv += `line,${lineStart.x.toFixed(2)},${lineStart.y.toFixed(2)},${lineEnd.x.toFixed(2)},${lineEnd.y.toFixed(2)},-,-\n`;
+                }                
+                currentTrack = { segments, csv, polygon };
+                return segments;
+            }
+
+            draw(segments, polygon, showFrame) {
+                ctx.clearRect(0, 0, this.width, this.height);
+                
+                if (showFrame && polygon && polygon.length > 0) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = '#4488ff';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([5, 5]);
+                    ctx.moveTo(polygon[0].x, polygon[0].y);
+                    for (let i = 1; i < polygon.length; i++) {
+                        ctx.lineTo(polygon[i].x, polygon[i].y);
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    
+                    ctx.fillStyle = '#4488ff';
+                    for (let i = 0; i < polygon.length; i++) {
+                        ctx.beginPath();
+                        ctx.arc(polygon[i].x, polygon[i].y, 4, 0, Math.PI * 2);
+                        ctx.fill();
+                        
+                        ctx.fillStyle = '#88ccff';
+                        ctx.font = '10px Arial';
+                        ctx.fillText(i, polygon[i].x + 6, polygon[i].y - 6);
+                        ctx.fillStyle = '#4488ff';
+                    }
+                }
+                
+                if (!segments || segments.length === 0) return;
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#ff0000';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                
+                let firstMove = true;
+                
+                for (const seg of segments) {
+                    if (seg.type === 'line') {
+                        if (firstMove) {
+                            ctx.moveTo(seg.start.x, seg.start.y);
+                            firstMove = false;
+                        }                        ctx.lineTo(seg.end.x, seg.end.y);
+                    } else if (seg.type === 'arc') {
+                        if (firstMove) {
+                            const startX = seg.center.x + Math.cos(seg.startAngle) * seg.radius;
+                            const startY = seg.center.y + Math.sin(seg.startAngle) * seg.radius;
+                            ctx.moveTo(startX, startY);
+                            firstMove = false;
+                        }
+                        ctx.arc(seg.center.x, seg.center.y, seg.radius, 
+                               seg.startAngle, seg.endAngle, seg.clockwise);
+                    }
+                }
+                
+                ctx.closePath();
+                ctx.stroke();
+            }
+        }
+
+        let generator;
+
+        function generateTrack() {
+            const numTurnsInput = document.getElementById('numTurns');
+            let numTurns = parseInt(numTurnsInput.value);
+            numTurns = Math.max(3, Math.min(30, numTurns));
+            numTurnsInput.value = numTurns;
+            
+            const curvatureInput = document.getElementById('curvatureCoeff');
+            let curvatureCoeff = parseFloat(curvatureInput.value);
+            curvatureCoeff = Math.max(0, Math.min(100, curvatureCoeff));
+            curvatureInput.value = curvatureCoeff;
+            
+            const minRadiusInput = document.getElementById('minRadius');
+            let minRadius = parseFloat(minRadiusInput.value);
+            minRadius = Math.max(10, Math.min(100, minRadius));
+            minRadiusInput.value = minRadius;
+            
+            const trackType = document.getElementById('trackType').value;
+            
+            generator = new TrackGenerator(canvas.width, canvas.height);
+            const segments = generator.generate(numTurns, curvatureCoeff, minRadius, trackType);
+            
+            const showFrame = document.getElementById('showFrame').checked;
+            generator.draw(segments, currentTrack?.polygon, showFrame);
+            
+            if (currentTrack) {
+                document.getElementById('csvOutput').textContent = currentTrack.csv;
+            }
+        }
+
+        function downloadTrack() {            if (!currentTrack) return;
+            
+            const blob = new Blob([currentTrack.csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'track.csv';
+            link.href = url;
+            link.click();
+            
+            const imgLink = document.createElement('a');
+            imgLink.download = 'racing-track.png';
+            imgLink.href = canvas.toDataURL();
+            imgLink.click();
+        }
+
+        window.onload = generateTrack;
+    </script>
+</body>
+</html>
