@@ -1,3 +1,4 @@
 # car_comparison
+![screenshot]()
 A realistic comparison of cars
 Код позволяет просимулировать поведение автомобилей в движении исходя из их технических характеристик.
