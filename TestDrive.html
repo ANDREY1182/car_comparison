@@ -7,6 +7,7 @@
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, sans-serif; }
         body { margin: 0; padding: 8px; background: #0b1a2f; color: #eef; display: flex; flex-direction: column; min-height: 100vh; }
+        h1 { font-size: 1.6rem; margin: 5px 0 5px; color: #ffcf8a; display: flex; align-items: center; gap: 6px; }
         .tabs { display: flex; gap: 6px; background: #1f2a40; padding: 5px; border-radius: 40px; margin: 10px 0 15px; }
         .tab-btn { flex: 1; background: transparent; border: none; color: #aab; font-weight: 600; padding: 10px 2px; border-radius: 30px; font-size: 0.95rem; }
         .tab-btn.active { background: #ffae42; color: #0b1a2f; }
@@ -96,7 +97,7 @@
             color: #8ab8ff;
             margin-left: 6px;
         }
-        /* Новые стили для управления генерацией */
+        /* Стили для генератора трасс */
         .generator-controls {
             background: #1a2a3a;
             border-radius: 20px;
@@ -111,7 +112,7 @@
             margin-bottom: 10px;
         }
         .generator-row label {
-            width: 100px;
+            width: 120px;
             color: #ffcf8a;
         }
         .generator-row input {
@@ -121,6 +122,12 @@
             border-radius: 24px;
             padding: 10px;
             color: white;
+        }
+        .generator-note {
+            font-size: 0.8rem;
+            color: #aab;
+            margin-top: 5px;
+            font-style: italic;
         }
     </style>
 </head>
@@ -183,40 +190,38 @@
         <div class="generator-controls">
             <div class="section-title">🎲 Генератор трасс</div>
             <div class="generator-row">
-                <label>Повороты:</label>
-                <input type="number" id="genTurns" min="3" max="25" value="12">
+                <label>Тип трассы:</label>
+                <select id="trackTypeSelect" style="flex:1;">
+                    <option value="twisty" selected>🐍 Извилистая (кольцо)</option>
+                    <option value="oval">⭕ Овал (кольцо)</option>
+                    <option value="drag">🏁 Драг (прямая)</option>
+                </select>
             </div>
             <div class="generator-row">
-                <label>Кривизна:</label>
-                <input type="number" id="genCurvature" min="0" max="100" step="10" value="100">
+                <label>Сложность:</label>
+                <input type="range" id="genComplexity" min="0" max="100" value="50" style="flex:1;">
+                <span id="complexityValue" style="color:#ffcf8a; min-width:40px;">50</span>
             </div>
-            <div class="generator-row">
-                <label>Радиус поворотов:</label>
-                <input type="number" id="cornerRadius" min="10" max="80" value="40">
+            <div class="generator-note">
+                • Для извилистой: больше поворотов и круче радиус<br>
+                • Для овала: фиксированная эллиптическая форма<br>
+                • Для драга: прямая линия
             </div>
-            <button id="generateTrackBtn" style="margin:5px 0;">🎲 Сгенерировать новую трассу</button>
+            <button id="generateTrackBtn" style="margin:10px 0 5px;">🎲 Сгенерировать</button>
         </div>
         
         <div class="param-row">
             <label>Название трассы</label>
             <input type="text" id="trackName" class="track-name" value="Домашний трек">
         </div>
-        <div class="param-row">
-            <label>Тип трассы</label>
-            <select id="trackTypeSelect">
-                <option value="drag">🏁 Драг (1/4 мили)</option>
-                <option value="oval">⭕ Овал (кольцо)</option>
-                <option value="twisty" selected>🐍 Извилистая</option>
-            </select>
-        </div>
-        <div class="param-row"><label>Длина круга, м</label><input type="number" id="trackLength" value="1800" step="50"></div>
-        <div class="param-row"><label>Кол-во поворотов</label><input type="number" id="trackTurns" value="8" min="4" max="16"></div>
+        <div class="param-row"><label>Длина круга, м</label><input type="number" id="trackLength" value="1800" step="50" readonly style="background:#1a2a3a;"></div>
+        <div class="param-row"><label>Кол-во поворотов</label><input type="number" id="trackTurns" value="8" min="4" max="16" readonly style="background:#1a2a3a;"></div>
         <div class="param-row"><label>Ширина трассы, м</label><input type="number" id="trackWidth" value="10" min="6" max="20"></div>
         <div class="param-row"><label>Сцепление</label><input type="number" id="grip" value="1.0" step="0.05"></div>
         
         <div class="track-preview">
             <canvas id="trackPreviewCanvas" width="400" height="300"></canvas>
-            <div class="track-info" id="trackInfo">Тип: Извилистая • 1800м • 8 поворотов</div>
+            <div class="track-info" id="trackInfo">Извилистая • 1800м • 8 поворотов</div>
         </div>
         
         <div class="btn-group">
@@ -224,7 +229,7 @@
             <button class="btn-load" id="loadTrackBtn">📂 Загрузить трассу (CSV)</button>
             <input type="file" id="loadTrackFile" accept=".csv" style="display:none">
         </div>
-        <button id="applyTrackBtn" style="margin-top:10px;">✅ Применить трассу</button>
+        <button id="applyTrackBtn" style="margin-top:10px;">✅ Применить</button>
     </div>
 
     <div id="race-panel" class="panel">
@@ -327,7 +332,7 @@
                 width: 10,
                 grip: 1.0,
                 centerLine: [],
-                cornerRadii: [] // Массив радиусов поворотов
+                cornerRadii: []
             };
 
             // ========== ГЕНЕРАТОР ТРАСС ==========
@@ -338,157 +343,117 @@
                     this.padding = 60;
                 }
 
-                generatePolygon(numCorners, curvatureCoeff) {
+                // Генерация драг-трассы (прямая)
+                generateDragTrack() {
+                    const points = [];
+                    const startX = this.padding;
+                    const endX = this.width - this.padding;
+                    const y = this.height / 2;
+                    
+                    // Создаем прямую линию с несколькими точками
+                    const steps = 10;
+                    for (let i = 0; i <= steps; i++) {
+                        const t = i / steps;
+                        points.push({
+                            x: startX + (endX - startX) * t,
+                            y: y
+                        });
+                    }
+                    
+                    return { points, radii: [] };
+                }
+
+                // Генерация овала
+                generateOvalTrack(complexity) {
                     const points = [];
                     const centerX = this.width / 2;
                     const centerY = this.height / 2;
+                    
+                    // Размеры овала зависят от сложности
+                    const radiusX = (this.width - this.padding * 2) * 0.4 * (0.8 + complexity * 0.4);
+                    const radiusY = (this.height - this.padding * 2) * 0.3 * (0.8 + complexity * 0.4);
+                    
+                    const steps = 40;
+                    for (let i = 0; i <= steps; i++) {
+                        const angle = (i / steps) * Math.PI * 2;
+                        points.push({
+                            x: centerX + Math.cos(angle) * radiusX,
+                            y: centerY + Math.sin(angle) * radiusY
+                        });
+                    }
+                    
+                    // Для овала нет отдельных поворотов, но для совместимости создадим массив радиусов
+                    const radii = new Array(8).fill(Math.min(radiusX, radiusY) * 0.5);
+                    
+                    return { points, radii };
+                }
+
+                // Генерация извилистой трассы
+                generateTwistyTrack(complexity) {
+                    // Количество поворотов зависит от сложности
+                    const numCorners = Math.floor(6 + complexity * 10);
+                    
+                    const points = [];
+                    const centerX = this.width / 2;
+                    const centerY = this.height / 2;
+                    
+                    // Базовый радиус и его вариация
                     const baseRadius = Math.min(this.width, this.height) / 2.5;
+                    const variation = baseRadius * complexity * 0.8;
                     
-                    const maxVariation = baseRadius * (curvatureCoeff / 100) * 1.5;
-                    const maxRadius = Math.min(this.width, this.height) / 2 - this.padding;
-                    
+                    // Генерируем опорные точки
+                    const controlPoints = [];
                     for (let i = 0; i < numCorners; i++) {
                         const angle = (i / numCorners) * Math.PI * 2;
-                        const radiusVariation = (Math.random() - 0.5) * 2 * maxVariation;
-                        let radius = baseRadius + radiusVariation;
+                        const radiusVar = (Math.random() - 0.5) * variation;
+                        let radius = baseRadius + radiusVar;
                         
-                        radius = Math.min(radius, maxRadius);
-                        radius = Math.max(radius, this.padding);
+                        radius = Math.max(this.padding, Math.min(radius, this.width / 2 - this.padding));
                         
-                        const angleVariation = (Math.random() - 0.5) * 0.3 * (curvatureCoeff / 50);
-                        const finalAngle = angle + angleVariation;
+                        const angleVar = (Math.random() - 0.5) * 0.5 * complexity;
+                        const finalAngle = angle + angleVar;
                         
-                        let x = centerX + Math.cos(finalAngle) * radius;
-                        let y = centerY + Math.sin(finalAngle) * radius;
-                        
-                        x = Math.max(this.padding, Math.min(this.width - this.padding, x));
-                        y = Math.max(this.padding, Math.min(this.height - this.padding, y));
-                        
-                        points.push({ x, y });
+                        controlPoints.push({
+                            x: centerX + Math.cos(finalAngle) * radius,
+                            y: centerY + Math.sin(finalAngle) * radius
+                        });
                     }
                     
-                    return points;
-                }
-
-                roundCorner(p0, p1, p2, radius) {
-                    const v1 = { x: p0.x - p1.x, y: p0.y - p1.y };
-                    const v2 = { x: p2.x - p1.x, y: p2.y - p1.y };
-                    
-                    const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-                    const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-                    
-                    const u1 = { x: v1.x / len1, y: v1.y / len1 };
-                    const u2 = { x: v2.x / len2, y: v2.y / len2 };
-                    
-                    const dot = u1.x * u2.x + u1.y * u2.y;
-                    const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
-                    
-                    let dist = radius / Math.tan(angle / 2);
-                    
-                    const maxDist = Math.min(len1, len2) * 0.45;
-                    if (dist > maxDist) {
-                        dist = maxDist;
-                        radius = dist * Math.tan(angle / 2);
-                    }
-                    
-                    const t1 = {
-                        x: p1.x + u1.x * dist,
-                        y: p1.y + u1.y * dist
-                    };
-                    const t2 = {
-                        x: p1.x + u2.x * dist,
-                        y: p1.y + u2.y * dist
-                    };
-                    
-                    const vt1 = { x: t1.x - p1.x, y: t1.y - p1.y };
-                    const vt2 = { x: t2.x - p1.x, y: t2.y - p1.y };
-                    
-                    const vt1Len = Math.sqrt(vt1.x * vt1.x + vt1.y * vt1.y);
-                    const vt2Len = Math.sqrt(vt2.x * vt2.x + vt2.y * vt2.y);
-                    
-                    const vt1Norm = { x: vt1.x / vt1Len, y: vt1.y / vt1Len };
-                    const vt2Norm = { x: vt2.x / vt2Len, y: vt2.y / vt2Len };
-                    
-                    const bisector = { 
-                        x: vt1Norm.x + vt2Norm.x, 
-                        y: vt1Norm.y + vt2Norm.y 
-                    };
-                    
-                    const bisectorLen = Math.sqrt(bisector.x * bisector.x + bisector.y * bisector.y);
-                    bisector.x /= bisectorLen;
-                    bisector.y /= bisectorLen;
-                    
-                    const centerDist = radius / Math.sin(angle / 2);
-                    const center = {
-                        x: p1.x + bisector.x * centerDist,
-                        y: p1.y + bisector.y * centerDist
-                    };
-                    
-                    const startAngle = Math.atan2(t1.y - center.y, t1.x - center.x);
-                    const endAngle = Math.atan2(t2.y - center.y, t2.x - center.x);
-                    
-                    let deltaAngle = endAngle - startAngle;
-                    while (deltaAngle <= -Math.PI) deltaAngle += 2 * Math.PI;
-                    while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
-                    
-                    return {
-                        center: center,
-                        radius: radius,
-                        startAngle: startAngle,
-                        endAngle: endAngle,
-                        clockwise: deltaAngle < 0,
-                        startPoint: t1,
-                        endPoint: t2
-                    };
-                }
-
-                generateCenterLine(numCorners = 10, curvatureCoeff = 100, cornerRadius = 40) {
-                    const polygon = this.generatePolygon(numCorners, curvatureCoeff);
-                    const allPoints = [];
-                    const radii = [];
-                    
-                    const arcs = [];
-                    for (let i = 0; i < polygon.length; i++) {
-                        const p0 = polygon[(i - 1 + polygon.length) % polygon.length];
-                        const p1 = polygon[i];
-                        const p2 = polygon[(i + 1) % polygon.length];
+                    // Создаем плавную кривую через опорные точки
+                    const steps = 15;
+                    for (let i = 0; i < controlPoints.length; i++) {
+                        const p0 = controlPoints[i];
+                        const p1 = controlPoints[(i + 1) % controlPoints.length];
+                        const p2 = controlPoints[(i + 2) % controlPoints.length];
                         
-                        const arc = this.roundCorner(p0, p1, p2, cornerRadius);
-                        arcs.push(arc);
-                        radii.push(arc.radius);
-                    }
-                    
-                    for (let i = 0; i < arcs.length; i++) {
-                        const arc = arcs[i];
-                        const nextArc = arcs[(i + 1) % arcs.length];
-                        
-                        const steps = 20;
-                        const angleStep = (arc.endAngle - arc.startAngle) / steps;
-                        
-                        for (let j = 0; j <= steps; j++) {
-                            const angle = arc.startAngle + angleStep * j;
-                            const x = arc.center.x + Math.cos(angle) * arc.radius;
-                            const y = arc.center.y + Math.sin(angle) * arc.radius;
-                            allPoints.push({ x, y });
-                        }
-                        
-                        const lineSteps = 15;
-                        for (let j = 1; j < lineSteps; j++) {
-                            const t = j / lineSteps;
-                            const x = arc.endPoint.x + (nextArc.startPoint.x - arc.endPoint.x) * t;
-                            const y = arc.endPoint.y + (nextArc.startPoint.y - arc.endPoint.y) * t;
-                            allPoints.push({ x, y });
+                        // Добавляем точки с интерполяцией
+                        for (let j = 0; j < steps; j++) {
+                            const t = j / steps;
+                            
+                            // Катмулл-ром сплайн для плавности
+                            const x = 0.5 * ((-p0.x + 3*p1.x - 3*p2.x + controlPoints[(i+3)%controlPoints.length].x) * t*t*t +
+                                           (2*p0.x - 5*p1.x + 4*p2.x - controlPoints[(i+3)%controlPoints.length].x) * t*t +
+                                           (-p0.x + p2.x) * t +
+                                           2*p1.x);
+                            
+                            const y = 0.5 * ((-p0.y + 3*p1.y - 3*p2.y + controlPoints[(i+3)%controlPoints.length].y) * t*t*t +
+                                           (2*p0.y - 5*p1.y + 4*p2.y - controlPoints[(i+3)%controlPoints.length].y) * t*t +
+                                           (-p0.y + p2.y) * t +
+                                           2*p1.y);
+                            
+                            points.push({ x, y });
                         }
                     }
                     
+                    // Удаляем дубликаты
                     const uniquePoints = [];
                     const tolerance = 3;
                     
-                    for (let i = 0; i < allPoints.length; i++) {
-                        const point = allPoints[i];
+                    for (let i = 0; i < points.length; i++) {
+                        const point = points[i];
                         let isDuplicate = false;
                         
-                        for (let j = Math.max(0, uniquePoints.length - 10); j < uniquePoints.length; j++) {
+                        for (let j = Math.max(0, uniquePoints.length - 5); j < uniquePoints.length; j++) {
                             const existing = uniquePoints[j];
                             const dist = Math.sqrt(
                                 Math.pow(point.x - existing.x, 2) + 
@@ -505,48 +470,46 @@
                         }
                     }
                     
+                    // Генерируем радиусы поворотов для физики
+                    const radii = new Array(numCorners).fill(30 + complexity * 40);
+                    
                     return { points: uniquePoints, radii };
+                }
+
+                generate(type, complexity) {
+                    complexity = Math.max(0, Math.min(1, complexity / 100));
+                    
+                    switch(type) {
+                        case 'drag':
+                            return this.generateDragTrack();
+                        case 'oval':
+                            return this.generateOvalTrack(complexity);
+                        case 'twisty':
+                        default:
+                            return this.generateTwistyTrack(complexity);
+                    }
                 }
             }
 
             let trackGenerator;
 
-            // ========== НОВАЯ ФУНКЦИЯ РАСЧЕТА СКОРОСТИ В ПОВОРОТЕ ==========
             function calculateCornerSpeed(mass, radius, grip) {
-                // Базовая скорость из центробежной силы: v = sqrt(g * grip * radius)
                 const g = 9.81;
-                let v_ms = Math.sqrt(g * grip * radius);  // скорость в м/с
-                
-                // Коррекция по массе: более тяжелые машины медленнее в поворотах
+                let v_ms = Math.sqrt(g * grip * radius);
                 const massFactor = 1.0 - Math.min(mass, 5000) / 5000 * 0.35;
                 v_ms = v_ms * massFactor;
-                
-                // Возвращаем в км/ч для отображения, но для физики оставляем м/с
                 return {
                     ms: v_ms,
                     kmh: v_ms * 3.6
                 };
             }
 
-            // ========== ФУНКЦИЯ ДЛЯ ОПРЕДЕЛЕНИЯ РАДИУСА ПОВОРОТОВ ==========
-            function getCornerRadiiFromPoints(points, numTurns) {
-                // Упрощенная оценка - используем средний радиус из генератора
-                // В реальности нужно анализировать кривизну трассы
-                const avgRadius = 40; // Берем из параметров генерации
-                const radii = [];
-                for (let i = 0; i < numTurns; i++) {
-                    // Добавляем небольшую вариацию для разнообразия
-                    radii.push(avgRadius * (0.8 + Math.random() * 0.4));
-                }
-                return radii;
-            }
-
             function getTrackData() {
                 return {
                     name: document.getElementById('trackName').value || "Трасса",
-                    type: document.getElementById('trackTypeSelect').value,
-                    length: parseFloat(document.getElementById('trackLength').value) || 1800,
-                    turns: parseInt(document.getElementById('trackTurns').value) || 8,
+                    type: trackConfig.type,
+                    length: trackConfig.length,
+                    turns: trackConfig.turns,
                     width: parseFloat(document.getElementById('trackWidth').value) || 10,
                     grip: parseFloat(document.getElementById('grip').value) || 1.0,
                     centerLine: trackConfig.centerLine,
@@ -575,21 +538,36 @@
                     totalLength += Math.sqrt(dx * dx + dy * dy);
                 }
                 
-                const p1 = points[points.length - 1];
-                const p2 = points[0];
-                const dx = p2.x - p1.x;
-                const dy = p2.y - p1.y;
-                totalLength += Math.sqrt(dx * dx + dy * dy);
+                // Замыкаем только для кольцевых трасс
+                if (trackConfig.type !== 'drag') {
+                    const p1 = points[points.length - 1];
+                    const p2 = points[0];
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    totalLength += Math.sqrt(dx * dx + dy * dy);
+                }
                 
                 return Math.round(totalLength * 2.5);
             }
 
-            function getTrackPosition(progress, points) {
+            function getTrackPosition(progress, points, isDrag = false) {
                 if (!points || points.length < 2) return {x: 100, y: 100};
                 
                 while (progress < 0) progress += 1;
                 while (progress > 1) progress -= 1;
                 
+                if (isDrag) {
+                    // Для драга - прямая линия от начала до конца
+                    const t = progress;
+                    const p1 = points[0];
+                    const p2 = points[points.length - 1];
+                    return {
+                        x: p1.x + (p2.x - p1.x) * t,
+                        y: p1.y + (p2.y - p1.y) * t
+                    };
+                }
+                
+                // Для кольцевых трасс
                 let totalLength = 0;
                 const segmentLengths = [];
                 
@@ -644,7 +622,7 @@
                 return points[0];
             }
 
-            function drawTrackSmooth(ctx, points, roadWidth, isPreview = false) {
+            function drawTrackSmooth(ctx, points, roadWidth, isPreview = false, isDrag = false) {
                 const W = isPreview ? 400 : 800;
                 const H = isPreview ? 300 : 600;
                 
@@ -681,7 +659,9 @@
                     ctx.lineTo(points[i].x, points[i].y);
                 }
                 
-                ctx.lineTo(points[0].x, points[0].y);
+                if (!isDrag) {
+                    ctx.lineTo(points[0].x, points[0].y);
+                }
                 ctx.stroke();
                 
                 ctx.strokeStyle = '#2a2a2a';
@@ -698,6 +678,7 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
                 
+                // Старт/финиш на первой точке
                 const startPos = points[0];
                 ctx.save();
                 ctx.translate(startPos.x, startPos.y);
@@ -714,10 +695,24 @@
                 ctx.font = 'bold 10px sans-serif';
                 ctx.shadowColor = '#000';
                 ctx.shadowBlur = 4;
-                ctx.fillText('S/F', -12, -15);
+                ctx.fillText(isDrag ? 'START' : 'S/F', -20, -15);
                 ctx.shadowBlur = 0;
                 
                 ctx.restore();
+                
+                // Для драга добавляем финиш
+                if (isDrag && points.length > 1) {
+                    const finishPos = points[points.length - 1];
+                    ctx.save();
+                    ctx.translate(finishPos.x, finishPos.y);
+                    ctx.fillStyle = '#ff4444';
+                    ctx.font = 'bold 10px sans-serif';
+                    ctx.shadowColor = '#000';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText('FINISH', -25, -15);
+                    ctx.shadowBlur = 0;
+                    ctx.restore();
+                }
             }
 
             // ========== ФИЗИКА ДВИГАТЕЛЯ ==========
@@ -817,17 +812,12 @@
                 return Math.max(1, Math.min(newGear, gears.length));
             }
 
-            // ========== ОБНОВЛЕННАЯ ФУНКЦИЯ ТОРМОЖЕНИЯ ==========
             function getBrakeIntensity(car, speedMs, distanceToCorner, targetSpeedMs) {
                 if (speedMs <= targetSpeedMs || distanceToCorner <= 0) return 0;
                 
-                // Динамический расчет торможения
                 const speedDiff = speedMs * speedMs - targetSpeedMs * targetSpeedMs;
                 const neededDecel = speedDiff / (2 * distanceToCorner);
-                
-                // Максимальное замедление зависит от сцепления
                 const maxDecel = 7.5 * trackConfig.grip;
-                
                 const intensity = Math.min(1.0, neededDecel / maxDecel);
                 return Math.max(0, intensity);
             }
@@ -893,11 +883,12 @@
             }
 
             function drawCars(nameA, nameB) {
-                const posANorm = posA / trackConfig.length;
-                const posBNorm = posB / trackConfig.length;
+                const trackLength = trackConfig.type === 'drag' ? trackConfig.length * 2 : trackConfig.length;
+                const posANorm = posA / trackLength;
+                const posBNorm = posB / trackLength;
                 
-                const pA = getTrackPosition(posANorm, trackConfig.centerLine);
-                const pB = getTrackPosition(posBNorm, trackConfig.centerLine);
+                const pA = getTrackPosition(posANorm, trackConfig.centerLine, trackConfig.type === 'drag');
+                const pB = getTrackPosition(posBNorm, trackConfig.centerLine, trackConfig.type === 'drag');
                 
                 const offset = -8;
                 const offsetB = 8;
@@ -929,7 +920,6 @@
                 ctx.restore();
             }
 
-            // ========== ОБНОВЛЕННАЯ ЛОГИКА ПОВОРОТОВ ==========
             function updateSim() {
                 if (!simRunning) return;
                 const carA = getCarAData(), carB = getCarBData();
@@ -939,7 +929,7 @@
                 lapTitleAEl.innerText = carA.name;
                 lapTitleBEl.innerText = carB.name;
                 
-                const trackLength = trackConfig.length;
+                const trackLength = trackConfig.type === 'drag' ? trackConfig.length * 2 : trackConfig.length;
                 const posANorm = posA / trackLength;
                 const posBNorm = posB / trackLength;
                 
@@ -960,32 +950,35 @@
                 const prevPosNormA = (lastPosA % trackLength) / trackLength;
                 const prevPosNormB = (lastPosB % trackLength) / trackLength;
                 
-                if (prevPosNormA > 0.9 && posANorm < 0.1) {
-                    if (lapStartTimeA > 0) {
-                        lapTimeA = simElapsedTime - lapStartTimeA;
-                        lastLapTimeA = lapTimeA;
-                        if (lapTimeA < bestLapA) {
-                            bestLapA = lapTimeA;
+                // Отслеживание кругов
+                if (trackConfig.type !== 'drag') {
+                    if (prevPosNormA > 0.9 && posANorm < 0.1) {
+                        if (lapStartTimeA > 0) {
+                            lapTimeA = simElapsedTime - lapStartTimeA;
+                            lastLapTimeA = lapTimeA;
+                            if (lapTimeA < bestLapA) {
+                                bestLapA = lapTimeA;
+                            }
+                            const avgSpeedMs = trackConfig.length / lapTimeA;
+                            avgSpeedAEl.innerText = Math.round(avgSpeedMs * 3.6) + ' км/ч';
+                            bestLapAEl.innerText = formatTime(bestLapA);
                         }
-                        const avgSpeedMs = trackLength / lapTimeA;
-                        avgSpeedAEl.innerText = Math.round(avgSpeedMs * 3.6) + ' км/ч';
-                        bestLapAEl.innerText = formatTime(bestLapA);
+                        lapStartTimeA = simElapsedTime;
                     }
-                    lapStartTimeA = simElapsedTime;
-                }
-                
-                if (prevPosNormB > 0.9 && posBNorm < 0.1) {
-                    if (lapStartTimeB > 0) {
-                        lapTimeB = simElapsedTime - lapStartTimeB;
-                        lastLapTimeB = lapTimeB;
-                        if (lapTimeB < bestLapB) {
-                            bestLapB = lapTimeB;
+                    
+                    if (prevPosNormB > 0.9 && posBNorm < 0.1) {
+                        if (lapStartTimeB > 0) {
+                            lapTimeB = simElapsedTime - lapStartTimeB;
+                            lastLapTimeB = lapTimeB;
+                            if (lapTimeB < bestLapB) {
+                                bestLapB = lapTimeB;
+                            }
+                            const avgSpeedMs = trackConfig.length / lapTimeB;
+                            avgSpeedBEl.innerText = Math.round(avgSpeedMs * 3.6) + ' км/ч';
+                            bestLapBEl.innerText = formatTime(bestLapB);
                         }
-                        const avgSpeedMs = trackLength / lapTimeB;
-                        avgSpeedBEl.innerText = Math.round(avgSpeedMs * 3.6) + ' км/ч';
-                        bestLapBEl.innerText = formatTime(bestLapB);
+                        lapStartTimeB = simElapsedTime;
                     }
-                    lapStartTimeB = simElapsedTime;
                 }
                 
                 lastPosA = posA;
@@ -994,44 +987,35 @@
                 let brakeA = false, brakeB = false;
                 let brakeIntensityA = 0, brakeIntensityB = 0;
                 
-                // ОБНОВЛЕННАЯ ЛОГИКА ПОВОРОТОВ
                 if (trackConfig.type === 'twisty' && trackConfig.cornerRadii.length > 0) {
                     for (let i = 0; i < trackConfig.turns; i++) {
-                        // Позиция поворота на трассе
                         const turnPos = (i + 0.3) / trackConfig.turns;
                         const radius = trackConfig.cornerRadii[i % trackConfig.cornerRadii.length];
                         
-                        // Рассчитываем целевую скорость для каждого автомобиля
                         const targetSpeedA = calculateCornerSpeed(carA.mass, radius, trackConfig.grip);
                         const targetSpeedB = calculateCornerSpeed(carB.mass, radius, trackConfig.grip);
                         
-                        // Расстояние до поворота для авто А
                         let distToTurnA = turnPos - posANorm;
                         if (distToTurnA < 0) distToTurnA += 1;
                         const distMetersA = distToTurnA * trackLength;
                         
-                        // Расстояние до поворота для авто Б
                         let distToTurnB = turnPos - posBNorm;
                         if (distToTurnB < 0) distToTurnB += 1;
                         const distMetersB = distToTurnB * trackLength;
                         
-                        // Зона торможения зависит от скорости (чем быстрее, тем раньше тормозим)
                         const brakeZoneA = Math.min(150, Math.max(50, speedA * 3.6 * 2));
                         const brakeZoneB = Math.min(150, Math.max(50, speedB * 3.6 * 2));
                         
-                        // Торможение для авто А
                         if (distMetersA < brakeZoneA && distMetersA > 0 && speedA > targetSpeedA.ms) {
                             brakeA = true;
                             brakeIntensityA = getBrakeIntensity(carA, speedA, distMetersA, targetSpeedA.ms);
                         }
                         
-                        // Торможение для авто Б
                         if (distMetersB < brakeZoneB && distMetersB > 0 && speedB > targetSpeedB.ms) {
                             brakeB = true;
                             brakeIntensityB = getBrakeIntensity(carB, speedB, distMetersB, targetSpeedB.ms);
                         }
                         
-                        // Отключаем торможение после прохождения поворота
                         if (Math.abs(posANorm - (turnPos + 0.1)) < 0.05) brakeA = false;
                         if (Math.abs(posBNorm - (turnPos + 0.1)) < 0.05) brakeB = false;
                     }
@@ -1040,15 +1024,18 @@
                 const accA = calcAcceleration(carA, speedA, gearA, brakeA, brakeIntensityA);
                 const accB = calcAcceleration(carB, speedB, gearB, brakeB, brakeIntensityB);
                 
-                const maxSpeed = trackConfig.type === 'drag' ? 70 : 60;
+                const maxSpeed = trackConfig.type === 'drag' ? 120 : 60;
                 speedA = Math.max(0, Math.min(maxSpeed, speedA + accA * dt));
                 speedB = Math.max(0, Math.min(maxSpeed, speedB + accB * dt));
                 
                 posA += speedA * dt;
                 posB += speedB * dt;
                 
-                if (posA > trackLength) posA -= trackLength;
-                if (posB > trackLength) posB -= trackLength;
+                // Зацикливание для кольцевых трасс
+                if (trackConfig.type !== 'drag') {
+                    if (posA > trackLength) posA -= trackLength;
+                    if (posB > trackLength) posB -= trackLength;
+                }
                 
                 gearA = updateGear(carA, speedA, gearA);
                 gearB = updateGear(carB, speedB, gearB);
@@ -1064,7 +1051,7 @@
                 rpmBSpan.innerText = Math.round(rpmB);
                 
                 let gap = Math.abs(posA - posB);
-                if (gap > trackLength / 2) {
+                if (trackConfig.type !== 'drag' && gap > trackLength / 2) {
                     gap = trackLength - gap;
                 }
                 gapValueEl.innerText = Math.round(gap);
@@ -1084,16 +1071,19 @@
                 else if (posB > posA) liveWinner.innerText = '👑 Лидирует ' + carB.name;
                 else liveWinner.innerText = '🤝 Равны';
                 
-                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3, false, trackConfig.type === 'drag');
                 drawCars(carA.name, carB.name);
             }
 
             function updateTrackPreview() {
-                const type = document.getElementById('trackTypeSelect').value;
-                const length = document.getElementById('trackLength').value;
-                const turns = document.getElementById('trackTurns').value;
+                const type = trackConfig.type;
+                const typeNames = {
+                    'drag': 'Драг',
+                    'oval': 'Овал',
+                    'twisty': 'Извилистая'
+                };
                 
-                trackInfoEl.innerText = `Тип: ${type === 'drag' ? 'Драг' : type === 'oval' ? 'Овал' : 'Извилистая'} • ${length}м • ${turns} пов.`;
+                trackInfoEl.innerText = `${typeNames[type]} • ${trackConfig.length}м • ${trackConfig.turns} поворотов`;
                 
                 previewCtx.clearRect(0, 0, 400, 300);
                 
@@ -1105,34 +1095,7 @@
                         y: p.y * scaleY
                     }));
                     
-                    const tempCtx = previewCtx;
-                    tempCtx.fillStyle = '#2d7a3e';
-                    tempCtx.fillRect(0, 0, 400, 300);
-                    
-                    tempCtx.strokeStyle = '#f4a460';
-                    tempCtx.lineWidth = 20;
-                    tempCtx.lineCap = 'round';
-                    tempCtx.lineJoin = 'round';
-                    
-                    tempCtx.beginPath();
-                    tempCtx.moveTo(previewPoints[0].x, previewPoints[0].y);
-                    for (let i = 1; i < previewPoints.length; i++) {
-                        tempCtx.lineTo(previewPoints[i].x, previewPoints[i].y);
-                    }
-                    tempCtx.lineTo(previewPoints[0].x, previewPoints[0].y);
-                    tempCtx.stroke();
-                    
-                    tempCtx.strokeStyle = '#2a2a2a';
-                    tempCtx.lineWidth = 15;
-                    tempCtx.stroke();
-                    
-                    const startPos = previewPoints[0];
-                    tempCtx.save();
-                    tempCtx.translate(startPos.x, startPos.y);
-                    tempCtx.fillStyle = '#fff';
-                    tempCtx.font = 'bold 8px sans-serif';
-                    tempCtx.fillText('S', -5, -8);
-                    tempCtx.restore();
+                    drawTrackSmooth(previewCtx, previewPoints, 15, true, type === 'drag');
                 }
             }
 
@@ -1274,19 +1237,18 @@
                         
                         trackConfig.name = "Загруженная трасса";
                         trackConfig.type = "twisty";
-                        trackConfig.turns = Math.floor(points.length / 20);
                         trackConfig.centerLine = points;
-                        trackConfig.cornerRadii = getCornerRadiiFromPoints(points, trackConfig.turns);
+                        trackConfig.turns = Math.floor(points.length / 15);
+                        trackConfig.cornerRadii = new Array(trackConfig.turns).fill(35);
                         trackConfig.length = calculateTrackLength(points);
                         
                         document.getElementById('trackName').value = trackConfig.name;
-                        document.getElementById('trackTypeSelect').value = trackConfig.type;
                         document.getElementById('trackLength').value = trackConfig.length;
                         document.getElementById('trackTurns').value = trackConfig.turns;
                         
                         alert(`Загружена трасса с ${points.length} точками`);
                         updateTrackPreview();
-                        drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                        drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3, false, trackConfig.type === 'drag');
                         resetSim();
                         
                     } catch(er) {
@@ -1313,47 +1275,53 @@
                 updateSim();
             };
             
+            // Обновление отображения значения сложности
+            const complexityInput = document.getElementById('genComplexity');
+            const complexitySpan = document.getElementById('complexityValue');
+            complexityInput.addEventListener('input', () => {
+                complexitySpan.textContent = complexityInput.value;
+            });
+            
+            // Генерация трассы
             document.getElementById('generateTrackBtn').onclick = () => {
-                const turns = parseInt(document.getElementById('genTurns').value) || 12;
-                const curvature = parseInt(document.getElementById('genCurvature').value) || 100;
-                const cornerRadius = parseInt(document.getElementById('cornerRadius').value) || 40;
+                const type = document.getElementById('trackTypeSelect').value;
+                const complexity = parseInt(complexityInput.value) || 50;
                 
                 trackGenerator = new TrackGenerator(800, 600);
-                const result = trackGenerator.generateCenterLine(turns, curvature, cornerRadius);
+                const result = trackGenerator.generate(type, complexity);
                 
-                trackConfig.name = "Сгенерированная трасса";
-                trackConfig.type = "twisty";
-                trackConfig.turns = turns;
+                trackConfig.type = type;
                 trackConfig.centerLine = result.points;
                 trackConfig.cornerRadii = result.radii;
+                trackConfig.turns = type === 'drag' ? 0 : (type === 'oval' ? 4 : result.radii.length);
                 trackConfig.length = calculateTrackLength(result.points);
                 
+                // Название по умолчанию
+                const typeNames = {
+                    'drag': 'Драг',
+                    'oval': 'Овал',
+                    'twisty': 'Извилистая'
+                };
+                trackConfig.name = `${typeNames[type]} трасса ${new Date().toLocaleTimeString()}`;
+                
                 document.getElementById('trackName').value = trackConfig.name;
-                document.getElementById('trackTypeSelect').value = trackConfig.type;
                 document.getElementById('trackLength').value = trackConfig.length;
                 document.getElementById('trackTurns').value = trackConfig.turns;
                 
                 resetSim();
-                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3, false, type === 'drag');
                 updateTrackPreview();
             };
             
             document.getElementById('applyTrackBtn').onclick = () => {
                 trackConfig.name = document.getElementById('trackName').value || "Трасса";
-                trackConfig.type = document.getElementById('trackTypeSelect').value;
-                trackConfig.length = parseFloat(document.getElementById('trackLength').value) || 1800;
-                trackConfig.turns = parseInt(document.getElementById('trackTurns').value) || 8;
                 trackConfig.width = parseFloat(document.getElementById('trackWidth').value) || 10;
                 trackConfig.grip = parseFloat(document.getElementById('grip').value) || 1.0;
                 
                 resetSim();
-                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3);
+                drawTrackSmooth(ctx, trackConfig.centerLine, trackConfig.width * 3, false, trackConfig.type === 'drag');
                 updateTrackPreview();
             };
-            
-            document.getElementById('trackTypeSelect').onchange = updateTrackPreview;
-            document.getElementById('trackTurns').onchange = updateTrackPreview;
-            document.getElementById('trackLength').onchange = updateTrackPreview;
             
             document.getElementById('startSimBtn').onclick = () => {
                 if (simRunning) {
@@ -1368,12 +1336,13 @@
             
             // Инициализация
             trackGenerator = new TrackGenerator(800, 600);
-            const result = trackGenerator.generateCenterLine(12, 100, 40);
+            const result = trackGenerator.generate('twisty', 50);
             trackConfig.centerLine = result.points;
             trackConfig.cornerRadii = result.radii;
-            trackConfig.length = calculateTrackLength(trackConfig.centerLine);
+            trackConfig.turns = result.radii.length;
+            trackConfig.length = calculateTrackLength(result.points);
             document.getElementById('trackLength').value = trackConfig.length;
-            document.getElementById('trackTurns').value = 12;
+            document.getElementById('trackTurns').value = trackConfig.turns;
             
             updateTrackPreview();
             drawTrackSmooth(ctx, trackConfig.centerLine, 30);
