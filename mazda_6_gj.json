@@ -1,0 +1,18 @@
+{
+  "name": "Mazda 6 GJ",
+  "power": 194,
+  "powerRpm": 6000,
+  "torque": 258,
+  "torqueRpm": 4000,
+  "mass": 1475,
+  "gearRatios": [
+    3.5,
+    2.1,
+    1.5,
+    1.1,
+    0.9
+  ],
+  "finalDrive": 4.3,
+  "tire": "225/45 R19",
+  "body": "sedan"
+}
