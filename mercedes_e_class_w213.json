@@ -1,0 +1,19 @@
+{
+  "name": "Mercedes E-Class W213",
+  "power": 245,
+  "powerRpm": 5500,
+  "torque": 370,
+  "torqueRpm": 1400,
+  "mass": 1875,
+  "gearRatios": [
+    4.3,
+    2.4,
+    1.6,
+    1.2,
+    1,
+    0.8
+  ],
+  "finalDrive": 3.1,
+  "tire": "245/45 R18",
+  "body": "sedan"
+}
