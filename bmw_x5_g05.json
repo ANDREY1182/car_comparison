@@ -1,0 +1,19 @@
+{
+  "name": "BMW X5 G05",
+  "power": 340,
+  "powerRpm": 5500,
+  "torque": 450,
+  "torqueRpm": 1500,
+  "mass": 2150,
+  "gearRatios": [
+    4.7,
+    2.8,
+    1.9,
+    1.4,
+    1.2,
+    1
+  ],
+  "finalDrive": 3.15,
+  "tire": "275/40 R20",
+  "body": "suv"
+}
