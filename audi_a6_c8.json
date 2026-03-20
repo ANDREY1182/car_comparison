@@ -1,0 +1,19 @@
+{
+  "name": "Audi A6 C8",
+  "power": 249,
+  "powerRpm": 5000,
+  "torque": 370,
+  "torqueRpm": 1600,
+  "mass": 1825,
+  "gearRatios": [
+    4.2,
+    2.3,
+    1.6,
+    1.2,
+    1,
+    0.8
+  ],
+  "finalDrive": 3.2,
+  "tire": "245/45 R19",
+  "body": "sedan"
+}
