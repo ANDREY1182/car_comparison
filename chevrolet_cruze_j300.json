@@ -1,0 +1,18 @@
+{
+  "name": "Chevrolet Cruze J300",
+  "power": 141,
+  "powerRpm": 6200,
+  "torque": 200,
+  "torqueRpm": 4800,
+  "mass": 1385,
+  "gearRatios": [
+    3.8,
+    2.1,
+    1.5,
+    1.2,
+    0.9
+  ],
+  "finalDrive": 4.2,
+  "tire": "215/60 R16",
+  "body": "sedan"
+}
